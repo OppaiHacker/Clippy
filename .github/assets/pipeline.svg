@@ -1,0 +1,98 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="208" viewBox="0 0 900 208" role="img" aria-label="Pipeline: replay buffer, auto-ingest, tag, per-track mix, ffmpeg export — the mix you hear is the mix you get">
+  <defs>
+    <linearGradient id="parity" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#fbbf24">
+        <animate attributeName="stop-color" values="#fbbf24;#34d399;#fbbf24" dur="5s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+    <radialGradient id="packet">
+      <stop offset="0%" stop-color="#ffffff"/><stop offset="55%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="900" height="208" rx="14" fill="#0b0d12"/>
+  <rect x="0.5" y="0.5" width="899" height="207" rx="14" fill="none" stroke="#1c2230"/>
+
+  <line x1="188.7" y1="74" x2="220.0" y2="74" stroke="#242c3c" stroke-width="2"/>
+    <line x1="188.7" y1="74" x2="220.0" y2="74" stroke="#22d3ee" stroke-width="2" stroke-dasharray="4 6" opacity="0.7">
+      <animate attributeName="stroke-dashoffset" values="20;0" dur="0.9s" repeatCount="indefinite"/>
+    </line>
+    <path d="M220.0 74 l-7 -4.5 v9 z" fill="#22d3ee" opacity="0.8"/><line x1="366.9" y1="74" x2="398.2" y2="74" stroke="#242c3c" stroke-width="2"/>
+    <line x1="366.9" y1="74" x2="398.2" y2="74" stroke="#f472b6" stroke-width="2" stroke-dasharray="4 6" opacity="0.7">
+      <animate attributeName="stroke-dashoffset" values="20;0" dur="0.9s" repeatCount="indefinite"/>
+    </line>
+    <path d="M398.2 74 l-7 -4.5 v9 z" fill="#f472b6" opacity="0.8"/><line x1="481.9" y1="74" x2="513.3" y2="74" stroke="#242c3c" stroke-width="2"/>
+    <line x1="481.9" y1="74" x2="513.3" y2="74" stroke="#34d399" stroke-width="2" stroke-dasharray="4 6" opacity="0.7">
+      <animate attributeName="stroke-dashoffset" values="20;0" dur="0.9s" repeatCount="indefinite"/>
+    </line>
+    <path d="M513.3 74 l-7 -4.5 v9 z" fill="#34d399" opacity="0.8"/><line x1="676.0" y1="74" x2="707.3" y2="74" stroke="#242c3c" stroke-width="2"/>
+    <line x1="676.0" y1="74" x2="707.3" y2="74" stroke="#fbbf24" stroke-width="2" stroke-dasharray="4 6" opacity="0.7">
+      <animate attributeName="stroke-dashoffset" values="20;0" dur="0.9s" repeatCount="indefinite"/>
+    </line>
+    <path d="M707.3 74 l-7 -4.5 v9 z" fill="#fbbf24" opacity="0.8"/>
+  <g>
+    <rect x="36.0" y="52.0" width="146.7" height="44" rx="22.0" fill="#12161f" stroke="#232b3b"/>
+    <rect x="36.0" y="52.0" width="146.7" height="44" rx="22.0" fill="none" stroke="#7c5cff" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0.95;0.25;0" keyTimes="0;0.030;0.120;1" dur="8.0s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="55.0" cy="74" r="4" fill="#7c5cff" opacity="0.45">
+      <animate attributeName="opacity" values="0.45;1;0.45" keyTimes="0;0.040;1" dur="8.0s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="4;6;4" keyTimes="0;0.040;1" dur="8.0s" repeatCount="indefinite"/>
+    </circle>
+    <text x="68.0" y="79" font-family="'JetBrains Mono',Consolas,monospace" font-size="13.5" fill="#cdd6e6">replay buffer</text>
+  </g><g>
+    <rect x="230.0" y="52.0" width="130.9" height="44" rx="22.0" fill="#12161f" stroke="#232b3b"/>
+    <rect x="230.0" y="52.0" width="130.9" height="44" rx="22.0" fill="none" stroke="#22d3ee" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0.95;0.25;0" keyTimes="0;0.230;0.320;1" dur="8.0s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="249.0" cy="74" r="4" fill="#22d3ee" opacity="0.45">
+      <animate attributeName="opacity" values="0.45;1;0.45" keyTimes="0;0.240;1" dur="8.0s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="4;6;4" keyTimes="0;0.240;1" dur="8.0s" repeatCount="indefinite"/>
+    </circle>
+    <text x="262.0" y="79" font-family="'JetBrains Mono',Consolas,monospace" font-size="13.5" fill="#cdd6e6">auto-ingest</text>
+  </g><g>
+    <rect x="408.2" y="52.0" width="67.7" height="44" rx="22.0" fill="#12161f" stroke="#232b3b"/>
+    <rect x="408.2" y="52.0" width="67.7" height="44" rx="22.0" fill="none" stroke="#f472b6" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0.95;0.25;0" keyTimes="0;0.430;0.520;1" dur="8.0s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="427.2" cy="74" r="4" fill="#f472b6" opacity="0.45">
+      <animate attributeName="opacity" values="0.45;1;0.45" keyTimes="0;0.440;1" dur="8.0s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="4;6;4" keyTimes="0;0.440;1" dur="8.0s" repeatCount="indefinite"/>
+    </circle>
+    <text x="440.2" y="79" font-family="'JetBrains Mono',Consolas,monospace" font-size="13.5" fill="#cdd6e6">tag</text>
+  </g><g>
+    <rect x="523.3" y="52.0" width="146.7" height="44" rx="22.0" fill="#12161f" stroke="#232b3b"/>
+    <rect x="523.3" y="52.0" width="146.7" height="44" rx="22.0" fill="none" stroke="#34d399" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0.95;0.25;0" keyTimes="0;0.630;0.720;1" dur="8.0s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="542.3" cy="74" r="4" fill="#34d399" opacity="0.45">
+      <animate attributeName="opacity" values="0.45;1;0.45" keyTimes="0;0.640;1" dur="8.0s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="4;6;4" keyTimes="0;0.640;1" dur="8.0s" repeatCount="indefinite"/>
+    </circle>
+    <text x="555.3" y="79" font-family="'JetBrains Mono',Consolas,monospace" font-size="13.5" fill="#cdd6e6">per-track mix</text>
+  </g><g>
+    <rect x="717.3" y="52.0" width="146.7" height="44" rx="22.0" fill="#12161f" stroke="#232b3b"/>
+    <rect x="717.3" y="52.0" width="146.7" height="44" rx="22.0" fill="none" stroke="#fbbf24" stroke-width="1.5" opacity="0">
+      <animate attributeName="opacity" values="0;0.95;0.25;0" keyTimes="0;0.830;0.920;1" dur="8.0s" repeatCount="indefinite"/>
+    </rect>
+    <circle cx="736.3" cy="74" r="4" fill="#fbbf24" opacity="0.45">
+      <animate attributeName="opacity" values="0.45;1;0.45" keyTimes="0;0.840;1" dur="8.0s" repeatCount="indefinite"/>
+      <animate attributeName="r" values="4;6;4" keyTimes="0;0.840;1" dur="8.0s" repeatCount="indefinite"/>
+    </circle>
+    <text x="749.3" y="79" font-family="'JetBrains Mono',Consolas,monospace" font-size="13.5" fill="#cdd6e6">ffmpeg export</text>
+  </g>
+
+  <circle cx="55.0" cy="74" r="9" fill="url(#packet)" opacity="0.9">
+    <animate attributeName="cx" values="55.0;249.0;427.2;542.3;736.3;736.3" keyTimes="0.000;0.200;0.400;0.600;0.800;1" dur="8.0s" repeatCount="indefinite" calcMode="spline" keySplines="0.6 0 0.2 1;0.6 0 0.2 1;0.6 0 0.2 1;0.6 0 0.2 1;0.6 0 0.2 1"/>
+  </circle>
+
+  <g stroke="url(#parity)" stroke-width="1.5" fill="none">
+    <path d="M596.6 102.0 V132 H790.6 V102.0"/>
+    <path d="M596.6 102.0 l-4.5 7 h9 z" fill="url(#parity)" stroke="none"/>
+    <path d="M790.6 102.0 l-4.5 7 h9 z" fill="url(#parity)" stroke="none"/>
+  </g>
+
+  <text x="693.6" y="156" text-anchor="middle" font-family="'Segoe UI',Inter,sans-serif" font-size="15" font-weight="700" fill="url(#parity)">what you hear is what you get</text>
+  <text x="693.6" y="176" text-anchor="middle" font-family="'JetBrains Mono',Consolas,monospace" font-size="11.5" fill="#6c778f">one mix document &#183; two renderers &#183; sample-identical</text>
+</svg>

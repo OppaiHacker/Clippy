@@ -1,0 +1,26 @@
+#!/bin/bash
+# Called by gpu-screen-recorder after it writes a file: $1 = path, $2 = regular|replay|screenshot
+# Writes a sidecar .json next to the clip holding the facts that exist ONLY at save time:
+# which window was focused and which apps were producing audio. Everything else (codecs,
+# duration, track names) stays readable from the file itself later, so it is not duplicated here.
+set -uo pipefail
+CLIP="$1"
+TYPE="${2:-replay}"
+SIDECAR="${CLIP%.*}.json"
+
+win=$(hyprctl activewindow -j 2>/dev/null)
+apps=$(gpu-screen-recorder --list-application-audio 2>/dev/null | jq -R . | jq -cs .)
+
+jq -n \
+  --arg file "$(basename "$CLIP")" \
+  --arg type "$TYPE" \
+  --arg saved_at "$(date -Iseconds)" \
+  --argjson window "${win:-null}" \
+  --argjson audio_apps "${apps:-[]}" \
+  '{file: $file, type: $type, saved_at: $saved_at,
+    game: ($window.initialClass // $window.class // null),
+    window_title: ($window.initialTitle // $window.title // null),
+    monitor: ($window.monitor // null),
+    audio_apps: $audio_apps}' > "$SIDECAR" 2>/dev/null
+
+notify-send -a "Clips" "Clip saved" "$(basename "$CLIP")${win:+ · $(jq -r '.class // "?"' <<<"$win")}"

@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="344" viewBox="0 0 900 344" role="img" aria-label="Clippy system requirements: minimum versus recommended">
+  <defs>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#12161f"/><stop offset="100%" stop-color="#0d1017"/>
+    </linearGradient>
+    <linearGradient id="gmin" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#3b4557"/><stop offset="100%" stop-color="#5c667d"/>
+    </linearGradient>
+    <linearGradient id="grec" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7c5cff"/>
+      <stop offset="100%" stop-color="#22d3ee">
+        <animate attributeName="stop-color" values="#22d3ee;#34d399;#22d3ee" dur="6s" repeatCount="indefinite"/>
+      </stop>
+    </linearGradient>
+    <linearGradient id="halo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c5cff"/><stop offset="50%" stop-color="#22d3ee"/><stop offset="100%" stop-color="#7c5cff"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="344" rx="16" fill="#0b0d12"/>
+  <rect x="0.5" y="0.5" width="899" height="343" rx="16" fill="none" stroke="#1c2230"/>
+
+  <rect x="24" y="24" width="404" height="268" rx="12" fill="url(#card)" stroke="#1e2532"/>
+  <text x="44" y="60" font-family="'Segoe UI',Inter,sans-serif" font-size="12" font-weight="700" letter-spacing="2" fill="#5c667d">MINIMUM</text>
+  <text x="44" y="88" font-family="'Segoe UI',Inter,sans-serif" font-size="20" font-weight="700" fill="#c3cbdb">It runs</text>
+  <text x="44" y="110" font-family="'Segoe UI',Inter,sans-serif" font-size="12" fill="#5c667d">1080p60 clips, exports take their time</text>
+
+  <rect x="460" y="24" width="416" height="268" rx="12" fill="url(#halo)" opacity="0.5">
+    <animate attributeName="opacity" values="0.35;0.7;0.35" dur="4s" repeatCount="indefinite"/>
+  </rect>
+  <rect x="461.2" y="25.2" width="413.6" height="265.6" rx="11" fill="url(#card)"/>
+  <text x="480" y="60" font-family="'Segoe UI',Inter,sans-serif" font-size="12" font-weight="700" letter-spacing="2" fill="#22d3ee">RECOMMENDED</text>
+  <text x="480" y="88" font-family="'Segoe UI',Inter,sans-serif" font-size="20" font-weight="700" fill="#f0f4fa">The tested machine</text>
+  <text x="480" y="110" font-family="'Segoe UI',Inter,sans-serif" font-size="12" fill="#6c778f">2560x1440 60 fps, 300 s replay buffer in RAM</text>
+  <g transform="translate(838,52)">
+    <circle r="5" fill="#34d399"><animate attributeName="opacity" values="1;0.2;1" dur="2s" repeatCount="indefinite"/></circle>
+    <circle r="5" fill="none" stroke="#34d399" stroke-width="1.5" opacity="0.6">
+      <animate attributeName="r" values="5;13" dur="2s" repeatCount="indefinite"/>
+      <animate attributeName="opacity" values="0.6;0" dur="2s" repeatCount="indefinite"/>
+    </circle>
+  </g>
+
+  <text x="44" y="132" font-family="'Segoe UI',Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="1.6" fill="#5c667d">CPU</text>
+    <text x="44" y="152" font-family="'Segoe UI',Inter,sans-serif" font-size="14" fill="#98a2b8">4 cores, x86-64</text>
+    <rect x="44" y="162" width="336" height="5" rx="2.5" fill="#1b2130"/>
+    <rect x="44" y="162" width="0" height="5" rx="2.5" fill="url(#gmin)">
+      <animate attributeName="width" values="0;0;84.0;84.0;84.0" keyTimes="0;0.040;0.340;0.88;1" dur="7s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.16 1 0.3 1;0 0 1 1;0 0 1 1"/>
+    </rect>
+    <text x="480" y="132" font-family="'Segoe UI',Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="1.6" fill="#5c667d">CPU</text>
+    <text x="480" y="152" font-family="'Segoe UI',Inter,sans-serif" font-size="14" font-weight="600" fill="#e6ebf5">Ryzen 7 5700X &#183; 8C/16T</text>
+    <rect x="480" y="162" width="336" height="5" rx="2.5" fill="#1b2130"/>
+    <rect x="480" y="162" width="0" height="5" rx="2.5" fill="url(#grec)">
+      <animate attributeName="width" values="0;0;336.0;336.0;336.0" keyTimes="0;0.040;0.340;0.88;1" dur="7s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.16 1 0.3 1;0 0 1 1;0 0 1 1"/>
+    </rect><text x="44" y="184" font-family="'Segoe UI',Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="1.6" fill="#5c667d">RAM</text>
+    <text x="44" y="204" font-family="'Segoe UI',Inter,sans-serif" font-size="14" fill="#98a2b8">8 GB</text>
+    <rect x="44" y="214" width="336" height="5" rx="2.5" fill="#1b2130"/>
+    <rect x="44" y="214" width="0" height="5" rx="2.5" fill="url(#gmin)">
+      <animate attributeName="width" values="0;0;43.7;43.7;43.7" keyTimes="0;0.090;0.390;0.88;1" dur="7s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.16 1 0.3 1;0 0 1 1;0 0 1 1"/>
+    </rect>
+    <text x="480" y="184" font-family="'Segoe UI',Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="1.6" fill="#5c667d">RAM</text>
+    <text x="480" y="204" font-family="'Segoe UI',Inter,sans-serif" font-size="14" font-weight="600" fill="#e6ebf5">64 GB</text>
+    <rect x="480" y="214" width="336" height="5" rx="2.5" fill="#1b2130"/>
+    <rect x="480" y="214" width="0" height="5" rx="2.5" fill="url(#grec)">
+      <animate attributeName="width" values="0;0;336.0;336.0;336.0" keyTimes="0;0.090;0.390;0.88;1" dur="7s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.16 1 0.3 1;0 0 1 1;0 0 1 1"/>
+    </rect><text x="44" y="236" font-family="'Segoe UI',Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="1.6" fill="#5c667d">GPU</text>
+    <text x="44" y="256" font-family="'Segoe UI',Inter,sans-serif" font-size="14" fill="#98a2b8">NVENC or VAAPI encoder</text>
+    <rect x="44" y="266" width="336" height="5" rx="2.5" fill="#1b2130"/>
+    <rect x="44" y="266" width="0" height="5" rx="2.5" fill="url(#gmin)">
+      <animate attributeName="width" values="0;0;84.0;84.0;84.0" keyTimes="0;0.140;0.440;0.88;1" dur="7s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.16 1 0.3 1;0 0 1 1;0 0 1 1"/>
+    </rect>
+    <text x="480" y="236" font-family="'Segoe UI',Inter,sans-serif" font-size="11" font-weight="700" letter-spacing="1.6" fill="#5c667d">GPU</text>
+    <text x="480" y="256" font-family="'Segoe UI',Inter,sans-serif" font-size="14" font-weight="600" fill="#e6ebf5">RTX 5080 &#183; 16 GB</text>
+    <rect x="480" y="266" width="336" height="5" rx="2.5" fill="#1b2130"/>
+    <rect x="480" y="266" width="0" height="5" rx="2.5" fill="url(#grec)">
+      <animate attributeName="width" values="0;0;336.0;336.0;336.0" keyTimes="0;0.140;0.440;0.88;1" dur="7s" repeatCount="indefinite" calcMode="spline" keySplines="0.4 0 0.2 1;0.16 1 0.3 1;0 0 1 1;0 0 1 1"/>
+    </rect>
+
+  <line x1="44" y1="304" x2="856" y2="304" stroke="#1c2230"/>
+  <text x="44" y="326" font-family="'JetBrains Mono',Consolas,monospace" font-size="12" fill="#6c778f">Arch Linux &#183; Wayland &#183; ffmpeg 7+ &#183; Python 3.12 &#183; PostgreSQL 17</text>
+</svg>

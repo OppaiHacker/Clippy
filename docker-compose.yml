@@ -1,0 +1,42 @@
+services:
+  clippy-db:
+    image: postgres:17
+    container_name: clippy-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: clippy
+      POSTGRES_PASSWORD: clippy
+      POSTGRES_DB: clippy
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - clippy_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U clippy -d clippy"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  clippy-app:
+    build: .
+    container_name: clippy-app
+    restart: unless-stopped
+    pid: "host"
+    ports:
+      - "127.0.0.1:8723:8723"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://clippy:clippy@clippy-db:5432/clippy
+      SYNC_DATABASE_URL: postgresql+psycopg2://clippy:clippy@clippy-db:5432/clippy
+      CLIPS_DIR: ${CLIPS_DIR:?set CLIPS_DIR in .env}
+      WORK_DIR: ${WORK_DIR:?set WORK_DIR in .env}
+      GSR_SCRIPT: /usr/local/bin/gsr-replay
+    volumes:
+      - ${CLIPS_DIR:?}:${CLIPS_DIR:?}:rw
+      - ${WORK_DIR:?}:${WORK_DIR:?}:rw
+      - ${GSR_SCRIPT:?}:/usr/local/bin/gsr-replay:ro
+    depends_on:
+      clippy-db:
+        condition: service_healthy
+
+volumes:
+  clippy_pgdata:

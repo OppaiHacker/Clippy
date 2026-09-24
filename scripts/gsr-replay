@@ -1,0 +1,69 @@
+#!/bin/bash
+# ShadowPlay-style replay buffer via gpu-screen-recorder.
+# usage: gsr-replay {start|stop|toggle|save [10|30|60|300]|status}
+# Clippy calls this script for its sidebar widget (GSR_SCRIPT in .env).
+set -uo pipefail
+
+CLIPS="${CLIPS_DIR:-$HOME/Videos/clips}"
+# first monitor from `gpu-screen-recorder --list-monitors` unless GSR_MONITOR names one, e.g. DP-2
+MONITOR="${GSR_MONITOR:-$(gpu-screen-recorder --list-monitors 2>/dev/null | head -n1 | cut -d"|" -f1)}"
+FPS=60
+BUFFER=300          # seconds held in RAM
+CODEC=h264          # h264 plays everywhere (Discord, browsers); av1 is smaller if your GPU encodes it
+QUALITY=very_high
+SAVED_HOOK="$(dirname "$(readlink -f "$0")")/gsr-saved"
+
+# One track per source. Repeated -a = separate tracks; "|" merges sources into one track.
+# Swap vesktop/Zen for your own voice chat and browser (gpu-screen-recorder --list-application-audio).
+AUDIO=(
+  -a "app-inverse:vesktop|app-inverse:Zen"   # game + rest of the system, without Discord and the browser
+  -a "app:vesktop"                           # Discord
+  -a "app:Zen"                               # browser
+  -a "default_input"                         # mic - follows the system default on purpose:
+)                                            # a named device breaks the replay when a wireless headset powers off
+
+PROC='^gpu-screen-recorder'
+
+running() { pgrep -f "$PROC" >/dev/null; }
+
+case "${1:-toggle}" in
+  start)
+    running && { notify-send -a "Clips" "Replay already running"; exit 0; }
+    mkdir -p "$CLIPS"
+    setsid gpu-screen-recorder \
+      -w "$MONITOR" -f "$FPS" -c mp4 -k "$CODEC" -q "$QUALITY" \
+      -r "$BUFFER" -replay-storage ram -restart-replay-on-save no \
+      "${AUDIO[@]}" \
+      -sc "$SAVED_HOOK" \
+      -o "$CLIPS" -ro "$CLIPS" >/dev/null 2>&1 < /dev/null &
+    sleep 2
+    if running; then
+      notify-send -a "Clips" "Replay buffer on" "${BUFFER}s · ${MONITOR} · ${FPS}fps"
+    else
+      notify-send -u critical -a "Clips" "Replay failed to start" "run gsr-replay start in a terminal to see why"
+      exit 1
+    fi
+    ;;
+  stop)
+    pkill -SIGINT -f "$PROC" && notify-send -a "Clips" "Replay buffer off"
+    ;;
+  toggle)
+    running && exec "$0" stop || exec "$0" start
+    ;;
+  save)
+    running || { notify-send -u critical -a "Clips" "Replay buffer is off"; exit 1; }
+    case "${2:-60}" in
+      10)  sig=-SIGRTMIN+1 ;;
+      30)  sig=-SIGRTMIN+2 ;;
+      60)  sig=-SIGRTMIN+3 ;;
+      300) sig=-SIGUSR1    ;;   # whole buffer
+      *)   echo "save takes 10, 30, 60 or 300" >&2; exit 2 ;;
+    esac
+    pkill "$sig" -f "$PROC" || notify-send -u critical -a "Clips" "Save failed" "gpu-screen-recorder did not take the signal"
+    ;;
+  status)
+    running && echo "running (buffer ${BUFFER}s -> $CLIPS)" || echo "stopped"
+    ;;
+  *)
+    echo "usage: gsr-replay {start|stop|toggle|save [10|30|60|300]|status}" >&2; exit 2 ;;
+esac
