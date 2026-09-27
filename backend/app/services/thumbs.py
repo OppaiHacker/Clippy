@@ -19,8 +19,9 @@ def generate_sprite(clip_path: Path, clip_id: int, duration_s: float) -> Path:
         return out_path
 
     dur = max(duration_s, 1.0)
-    # fps=40/dur takes 40 evenly distributed frames, scales them to 160px wide, and packs into 8x5 grid
-    vf = f"fps=40/{dur},scale=160:-1,tile=8x5"
+    # fps=40/dur takes 40 evenly distributed frames, scales them to 480px wide, and packs into 8x5 grid.
+    # 480px keeps a 250-500px card sharp on a HiDPI screen; 160px looked pixelated.
+    vf = f"fps=40/{dur},scale=480:-2:flags=lanczos,tile=8x5"
     return ffmpeg_atomic(
         ["-i", str(clip_path), "-vf", vf, "-frames:v", "1", "-q:v", "3", "-update", "1"],
         out_path,
