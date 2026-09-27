@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { Film, Sliders, Download, Tag, Settings, Search, RefreshCw, Keyboard, Check, X, Power } from 'lucide-vue-next';
-import { fetchRecorderStatus, toggleRecorder, fetchJobs, saveReplay } from '../api/client';
-import { RecorderStatus } from '../types';
+import { Film, Sliders, Download, Tag, Settings, Search, RefreshCw, Keyboard, Check, X, Power, SlidersHorizontal } from 'lucide-vue-next';
+import { fetchRecorderStatus, toggleRecorder, fetchJobs, saveReplay, fetchRecorderConfig } from '../api/client';
+import { RecorderStatus, RecorderConfig } from '../types';
+import RecorderSettingsModal from './RecorderSettingsModal.vue';
 
 defineProps<{
   activeTab: string;
@@ -19,6 +20,10 @@ const searchInputRef = ref<HTMLInputElement | null>(null);
 const recorder = ref<RecorderStatus>({ status: 'checking', running: false, raw: '' });
 const activeJobsCount = ref(0);
 const isTogglingRecorder = ref(false);
+const recorderConfig = ref<RecorderConfig | null>(null);
+const showRecorderSettings = ref(false);
+
+const fmtSeconds = (s: number) => (s % 60 === 0 && s >= 60 ? `${s / 60}m` : `${s}s`);
 
 const tabs = [
   { id: 'library', label: 'Library', icon: Film },
@@ -43,6 +48,7 @@ const checkStatus = async () => {
 
 onMounted(() => {
   checkStatus();
+  fetchRecorderConfig().then(c => (recorderConfig.value = c)).catch(() => {});
   intervalId = setInterval(checkStatus, 3000);
 });
 
@@ -156,13 +162,25 @@ defineExpose({
           </span>
           <div class="min-w-0">
             <div class="text-xs font-semibold text-text">{{ recorder.running ? 'Recording' : 'Buffer off' }}</div>
-            <div class="text-[10px] text-text-3 mono-num">{{ recorder.running ? 'RAM · last 300 s' : 'ALT+F9 to start' }}</div>
+            <div class="text-[10px] text-text-3 mono-num truncate">
+              <template v-if="recorder.running">RAM · {{ recorder.buffer ?? '?' }} s · {{ recorder.fps ?? '?' }} fps</template>
+              <template v-else>{{ recorderConfig?.binds.toggle || 'ALT + F9' }} to start</template>
+            </div>
           </div>
         </div>
+        <div class="flex items-center gap-1 shrink-0">
+        <button
+          @click="showRecorderSettings = true"
+          title="Recorder settings: fps, buffer, hotkeys"
+          aria-label="Recorder settings"
+          class="w-7 h-7 rounded-lg flex items-center justify-center border border-border-strong text-text-2 hover:text-text hover:bg-surface-3 cursor-pointer"
+        >
+          <SlidersHorizontal :size="13" />
+        </button>
         <button
           @click="handleToggleRecorder"
           :disabled="isTogglingRecorder"
-          :title="recorder.running ? 'Stop buffer (ALT+F9)' : 'Start buffer (ALT+F9)'"
+          :title="`${recorder.running ? 'Stop' : 'Start'} buffer (${recorderConfig?.binds.toggle || 'ALT + F9'})`"
           class="w-7 h-7 rounded-lg flex items-center justify-center border cursor-pointer disabled:opacity-50"
           :class="recorder.running
             ? 'border-danger/40 text-danger hover:bg-danger/15'
@@ -171,6 +189,7 @@ defineExpose({
           <RefreshCw v-if="isTogglingRecorder" :size="13" class="animate-spin" />
           <Power v-else :size="13" />
         </button>
+        </div>
       </div>
 
       <!-- Save a clip from the buffer (works even when the Hyprland hotkeys do not fire) -->
@@ -189,17 +208,24 @@ defineExpose({
             :key="sec"
             @click="handleSaveReplay(sec)"
             :disabled="savingSeconds !== null"
-            :title="`Dump the last ${sec} s of the RAM buffer to a file`"
+            :title="sec === 300 ? 'Dump the whole RAM buffer to a file' : `Dump the last ${sec} s of the RAM buffer to a file`"
             class="h-7 rounded-md text-[11px] font-mono border cursor-pointer disabled:opacity-50"
             :class="savingSeconds === sec
               ? 'border-accent/50 bg-accent/20 text-accent'
               : 'border-border bg-surface/60 text-text-2 hover:text-text hover:border-border-strong'"
           >
-            {{ sec === 300 ? '5m' : sec + 's' }}
+            {{ sec === 300 ? fmtSeconds(recorder.buffer ?? 300) : sec + 's' }}
           </button>
         </div>
       </div>
     </div>
+
+    <RecorderSettingsModal
+      :is-open="showRecorderSettings"
+      :running="recorder.running"
+      @close="showRecorderSettings = false"
+      @saved="(c, st) => { recorderConfig = c; recorder = st; }"
+    />
 
     <!-- Shortcuts -->
     <button

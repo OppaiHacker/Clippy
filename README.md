@@ -198,6 +198,8 @@ bind = ALT SUPER, F10, exec, ~/.local/bin/gsr-replay save 10
 bind = ALT,       F11, exec, ~/.local/bin/gsr-replay save 300
 ```
 
+FPS, buffer length and these hotkeys can also be changed from the sidebar (the sliders button on the recorder widget). Clippy writes them to `~/.config/clippy/recorder.env`: `gsr-replay` sources it for `FPS` and `BUFFER`, and your Hyprland config can read the `BIND_*` lines instead of hard-coding the binds. After a save Clippy runs `hyprctl reload`, and restarts the recorder if it is running.
+
 A sidecar looks like this. Every field is optional, and a clip without a sidecar is ingested all the same:
 
 ```json

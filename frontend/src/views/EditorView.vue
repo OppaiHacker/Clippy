@@ -657,9 +657,10 @@ const removeImport = async (importId: number, name: string) => {
           <div class="flex items-center gap-2 min-w-0">
             <span class="text-[15px] font-semibold tracking-tight text-text truncate">{{ clip.title || clip.filename }}</span>
             <span class="shrink-0 px-2 py-0.5 rounded-full bg-accent/15 text-accent text-[11px] font-medium">{{ clip.game || 'Other' }}</span>
+            <span class="shrink-0 px-2 py-0.5 rounded-full bg-surface-2 text-text-2 text-[11px] font-medium mono-num">{{ Math.round(clip.fps) }} fps</span>
           </div>
           <div class="text-[11px] text-text-3 mono-num mt-0.5">
-            {{ clip.width }}×{{ clip.height }} · {{ Math.round(clip.fps) }} fps · {{ formatTimecode(duration) }} · {{ currentMix.tracks.length }} audio {{ plural(currentMix.tracks.length, 'track') }}
+            {{ clip.width }}×{{ clip.height }} · {{ formatTimecode(duration) }} · {{ currentMix.tracks.length }} audio {{ plural(currentMix.tracks.length, 'track') }}
           </div>
         </div>
       </div>

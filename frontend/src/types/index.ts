@@ -129,4 +129,16 @@ export interface RecorderStatus {
   status: string;
   running: boolean;
   raw: string;
+  // of the running process (null when stopped)
+  fps?: number | null;
+  buffer?: number | null;
+}
+
+export type RecorderBindAction = 'toggle' | 'save_10' | 'save_30' | 'save_60' | 'save_full';
+
+export interface RecorderConfig {
+  fps: number;
+  buffer: number;
+  // Hyprland combos like "ALT + SHIFT + F10"; "" = no bind
+  binds: Record<RecorderBindAction, string>;
 }

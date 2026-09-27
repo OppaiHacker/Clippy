@@ -1,4 +1,4 @@
-import { Clip, MixDocument, TagItem, Job, ExportItem, RecorderStatus } from '../types';
+import { Clip, MixDocument, TagItem, Job, ExportItem, RecorderStatus, RecorderConfig } from '../types';
 
 const API_BASE = '/api';
 
@@ -106,6 +106,22 @@ export async function fetchRecorderStatus(): Promise<RecorderStatus> {
 export async function toggleRecorder(): Promise<RecorderStatus> {
   const res = await fetch(`${API_BASE}/recorder/toggle`, { method: 'POST' });
   if (!res.ok) throw new Error('Failed to toggle recorder');
+  return res.json();
+}
+
+export async function fetchRecorderConfig(): Promise<RecorderConfig> {
+  const res = await fetch(`${API_BASE}/recorder/config`);
+  if (!res.ok) throw new Error('Failed to fetch recorder config');
+  return res.json();
+}
+
+export async function saveRecorderConfig(cfg: RecorderConfig): Promise<{ config: RecorderConfig; recorder: RecorderStatus }> {
+  const res = await fetch(`${API_BASE}/recorder/config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(cfg),
+  });
+  if (!res.ok) throw new Error(JSON.stringify((await res.json().catch(() => ({}))).detail) || 'Failed to save recorder config');
   return res.json();
 }
 

@@ -1,16 +1,19 @@
 #!/bin/bash
 # ShadowPlay-style replay buffer via gpu-screen-recorder.
-# usage: gsr-replay {start|stop|toggle|save [10|30|60|300]|status}
+# usage: gsr-replay {start|stop|restart|toggle|save [10|30|60|300]|status}
 # Clippy calls this script for its sidebar widget (GSR_SCRIPT in .env).
 set -uo pipefail
 
 CLIPS="${CLIPS_DIR:-$HOME/Videos/clips}"
 # first monitor from `gpu-screen-recorder --list-monitors` unless GSR_MONITOR names one, e.g. DP-2
 MONITOR="${GSR_MONITOR:-$(gpu-screen-recorder --list-monitors 2>/dev/null | head -n1 | cut -d"|" -f1)}"
-FPS=60
+FPS=180
 BUFFER=300          # seconds held in RAM
 CODEC=h264          # h264 plays everywhere (Discord, browsers); av1 is smaller if your GPU encodes it
 QUALITY=very_high
+# Clippy's recorder settings write FPS and BUFFER here; the file wins over the defaults above.
+CONF="$HOME/.config/clippy/recorder.env"
+[ -f "$CONF" ] && . "$CONF"
 SAVED_HOOK="$(dirname "$(readlink -f "$0")")/gsr-saved"
 
 # One track per source. Repeated -a = separate tracks; "|" merges sources into one track.
@@ -22,7 +25,7 @@ AUDIO=(
   -a "default_input"                         # mic - follows the system default on purpose:
 )                                            # a named device breaks the replay when a wireless headset powers off
 
-PROC='^gpu-screen-recorder'
+PROC='^([^ ]*/)?gpu-screen-recorder'
 
 running() { pgrep -f "$PROC" >/dev/null; }
 
@@ -30,7 +33,9 @@ case "${1:-toggle}" in
   start)
     running && { notify-send -a "Clips" "Replay already running"; exit 0; }
     mkdir -p "$CLIPS"
-    setsid gpu-screen-recorder \
+    # own systemd scope: started from Clippy's service it would otherwise die when that service restarts
+    scope=(); command -v systemd-run >/dev/null && systemctl --user show-environment >/dev/null 2>&1 && scope=(systemd-run --user --scope --quiet --collect)
+    setsid "${scope[@]}" gpu-screen-recorder \
       -w "$MONITOR" -f "$FPS" -c mp4 -k "$CODEC" -q "$QUALITY" \
       -r "$BUFFER" -replay-storage ram -restart-replay-on-save no \
       "${AUDIO[@]}" \
@@ -47,6 +52,11 @@ case "${1:-toggle}" in
   stop)
     pkill -SIGINT -f "$PROC" && notify-send -a "Clips" "Replay buffer off"
     ;;
+  restart)
+    "$0" stop
+    for _ in $(seq 50); do running || break; sleep 0.2; done   # SIGINT exit takes a moment
+    exec "$0" start
+    ;;
   toggle)
     running && exec "$0" stop || exec "$0" start
     ;;
@@ -62,8 +72,11 @@ case "${1:-toggle}" in
     pkill "$sig" -f "$PROC" || notify-send -u critical -a "Clips" "Save failed" "gpu-screen-recorder did not take the signal"
     ;;
   status)
-    running && echo "running (buffer ${BUFFER}s -> $CLIPS)" || echo "stopped"
+    # values of the running process, not of the config: they differ until the next restart
+    args=$(pgrep -af "$PROC" | head -n1)
+    [ -n "$args" ] || { echo "stopped"; exit 0; }
+    echo "running (buffer $(sed -E 's/.* -r ([0-9]+).*/\1/' <<<"$args")s, $(sed -E 's/.* -f ([0-9]+).*/\1/' <<<"$args")fps -> $CLIPS)"
     ;;
   *)
-    echo "usage: gsr-replay {start|stop|toggle|save [10|30|60|300]|status}" >&2; exit 2 ;;
+    echo "usage: gsr-replay {start|stop|restart|toggle|save [10|30|60|300]|status}" >&2; exit 2 ;;
 esac
