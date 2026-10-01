@@ -1,12 +1,36 @@
 from datetime import datetime
 from typing import List, Optional
+from datetime import timezone
 from sqlalchemy import (
-    Integer, BigInteger, Float, String, Boolean, Text, DateTime,
+    Integer, BigInteger, Float, String, Boolean, Text, DateTime, JSON,
     ForeignKey, PrimaryKeyConstraint, func, Index
 )
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.types import TypeDecorator
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.database import Base
+
+
+class UTCDateTime(TypeDecorator):
+    """timestamptz on Postgres. SQLite has no time zones and hands back naive values,
+    which would break comparisons with datetime.now(timezone.utc) and lose the "Z"
+    in the API, so values are stored as UTC and come back tagged as UTC."""
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value, dialect):
+        if value is not None and dialect.name == "sqlite" and value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value
+
+    def process_result_value(self, value, dialect):
+        if value is not None and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value
+
+
+# JSONB on Postgres (same schema as before), plain JSON text on SQLite
+JSONDoc = JSON().with_variant(JSONB, "postgresql")
 
 class Clip(Base):
     __tablename__ = "clips"
@@ -14,7 +38,7 @@ class Clip(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     path: Mapped[str] = mapped_column(String, unique=True, nullable=False, index=True)
     filename: Mapped[str] = mapped_column(String, nullable=False)
-    saved_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    saved_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     game: Mapped[Optional[str]] = mapped_column(String, nullable=True, index=True)
     window_title: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     monitor: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
@@ -28,11 +52,11 @@ class Clip(Base):
     starred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     title: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    ingested_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    indexed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    last_opened_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    ingested_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), nullable=False)
+    indexed_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
+    last_opened_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
     # trash: set = clip deleted; after TRASH_RETENTION_DAYS it is purged together with its file
-    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True, index=True)
 
     # Relationships
     audio_tracks: Mapped[List["AudioTrack"]] = relationship("AudioTrack", back_populates="clip", cascade="all, delete-orphan", order_by="AudioTrack.stream_index")
@@ -72,7 +96,7 @@ class ImportedTrack(Base):
     display_name: Mapped[str] = mapped_column(String, nullable=False)
     origin: Mapped[str] = mapped_column(String, nullable=False)  # file | voiceover
     duration_s: Mapped[float] = mapped_column(Float, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), nullable=False)
 
     clip: Mapped["Clip"] = relationship("Clip", back_populates="imported_tracks")
 
@@ -82,8 +106,8 @@ class MixDocument(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     clip_id: Mapped[int] = mapped_column(Integer, ForeignKey("clips.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
-    doc: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    doc: Mapped[dict] = mapped_column(JSONDoc, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), onupdate=func.now(), nullable=False)
 
     clip: Mapped["Clip"] = relationship("Clip", back_populates="mix_document")
 
@@ -120,7 +144,7 @@ class MixPreset(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     name: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    doc: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    doc: Mapped[dict] = mapped_column(JSONDoc, nullable=False)
 
 
 class Export(Base):
@@ -133,7 +157,7 @@ class Export(Base):
     path: Mapped[str] = mapped_column(String, nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, default=0, nullable=False)
     duration_s: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), nullable=False)
 
     clip: Mapped["Clip"] = relationship("Clip", back_populates="exports")
 
@@ -148,8 +172,8 @@ class Job(Base):
     state: Mapped[str] = mapped_column(String, default="pending", nullable=False, index=True)  # pending | running | done | error
     progress: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     error: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    finished_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UTCDateTime, server_default=func.now(), nullable=False)
+    finished_at: Mapped[Optional[datetime]] = mapped_column(UTCDateTime, nullable=True)
 
     clip: Mapped[Optional["Clip"]] = relationship("Clip", back_populates="jobs")
 

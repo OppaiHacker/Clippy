@@ -1,16 +1,36 @@
+import os
+import sys
 from pathlib import Path
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+WINDOWS = sys.platform == "win32"
+DEFAULT_WORK_DIR = (Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "Clippy"
+                    if WINDOWS else Path.home() / ".local/share/clippy")
+
 class Settings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://clippy:clippy@localhost:5434/clippy"
-    sync_database_url: str = "postgresql+psycopg2://clippy:clippy@localhost:5434/clippy"
+    # Linux: Postgres from docker compose. Windows: no Docker, one SQLite file in work_dir.
+    # Empty = the platform default, filled in below once work_dir is known.
+    database_url: str = "" if WINDOWS else "postgresql+asyncpg://clippy:clippy@localhost:5434/clippy"
+    sync_database_url: str = "" if WINDOWS else "postgresql+psycopg2://clippy:clippy@localhost:5434/clippy"
     
     clips_dir: Path = Path.home() / "Videos/clips"
-    work_dir: Path = Path.home() / ".local/share/clippy"
+    work_dir: Path = DEFAULT_WORK_DIR
     
     gsr_script: Path = Path.home() / ".local/bin/gsr-replay"
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    @model_validator(mode="after")
+    def default_sqlite(self):
+        db = self.work_dir / "clippy.db"
+        if not self.database_url or not self.sync_database_url:
+            self.work_dir.mkdir(parents=True, exist_ok=True)
+        if not self.database_url:
+            self.database_url = f"sqlite+aiosqlite:///{db.as_posix()}"
+        if not self.sync_database_url:
+            self.sync_database_url = f"sqlite:///{db.as_posix()}"
+        return self
 
     @property
     def audio_dir(self) -> Path:
