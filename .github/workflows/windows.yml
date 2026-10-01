@@ -27,6 +27,17 @@ jobs:
         with:
           python-version: "3.12"
       - run: uv sync --group build
+
+      - name: ffmpeg into bin/ (bundled with the exe, and on PATH for the tests)
+        run: |
+          mkdir bin
+          curl -fL -o ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-gpl-7.1.zip
+          7z x ffmpeg.zip -offmpeg-extract
+          cp ffmpeg-extract/*/bin/ffmpeg.exe ffmpeg-extract/*/bin/ffprobe.exe bin/
+          bin/ffmpeg.exe -hide_banner -encoders | grep -E "h264_nvenc|h264_amf|h264_qsv|libopus"
+          bin/ffmpeg.exe -hide_banner -filters | grep ddagrab
+          echo "$PWD/bin" >> "$GITHUB_PATH"
+
       - name: Tests
         run: |
           # failures as annotations: those are readable without access to the job log
@@ -39,15 +50,8 @@ jobs:
           targets: x86_64-pc-windows-msvc
       - run: cargo build --release --manifest-path native/clippy-audio/Cargo.toml
 
-      - name: Collect bin/ (ffmpeg, ffprobe, clippy-audio)
-        run: |
-          mkdir bin
-          curl -fL -o ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-gpl-7.1.zip
-          7z x ffmpeg.zip -offmpeg-extract
-          cp ffmpeg-extract/*/bin/ffmpeg.exe ffmpeg-extract/*/bin/ffprobe.exe bin/
-          cp native/clippy-audio/target/release/clippy-audio.exe bin/
-          bin/ffmpeg.exe -hide_banner -encoders | grep -E "h264_nvenc|h264_amf|h264_qsv|libopus"
-          bin/ffmpeg.exe -hide_banner -filters | grep ddagrab
+      - name: Add clippy-audio to bin/
+        run: cp native/clippy-audio/target/release/clippy-audio.exe bin/
 
       - name: Build exe
         run: |
