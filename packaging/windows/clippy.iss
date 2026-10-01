@@ -20,6 +20,9 @@ Compression=lzma2
 SolidCompression=yes
 CloseApplications=force
 WizardStyle=modern
+; several sizes: Inno picks the one matching the display scale
+WizardImageFile=art\wizard-*.bmp
+WizardSmallImageFile=art\small-*.bmp
 
 [Tasks]
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked

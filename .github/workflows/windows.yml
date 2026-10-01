@@ -31,7 +31,7 @@ jobs:
       - name: ffmpeg into bin/ (bundled with the exe, and on PATH for the tests)
         run: |
           mkdir bin
-          curl -fL -o ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-gpl-7.1.zip
+          curl -fL -o ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n8.1-latest-win64-gpl-8.1.zip
           7z x ffmpeg.zip -offmpeg-extract
           cp ffmpeg-extract/*/bin/ffmpeg.exe ffmpeg-extract/*/bin/ffprobe.exe bin/
           bin/ffmpeg.exe -hide_banner -encoders | grep -E "h264_nvenc|h264_amf|h264_qsv|libopus"
