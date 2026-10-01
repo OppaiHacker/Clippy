@@ -75,7 +75,8 @@ jobs:
           ISCC="C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
           [[ -f "$ISCC" ]] || { choco install innosetup -y --no-progress; }
           set +eo pipefail
-          "$ISCC" /DAppVersion="$VERSION" packaging/windows/clippy.iss > iscc.log 2>&1; rc=$?
+          # MSYS would rewrite /DAppVersion=... into a path
+          MSYS_NO_PATHCONV=1 "$ISCC" /DAppVersion="$VERSION" packaging/windows/clippy.iss > iscc.log 2>&1; rc=$?
           cat iscc.log
           [[ $rc == 0 ]] || { tail -n 25 iscc.log | sed 's/^/::error::/'; exit $rc; }
 
