@@ -19,6 +19,7 @@ OutputBaseFilename=ClippySetup-{#AppVersion}
 Compression=lzma2
 SolidCompression=yes
 CloseApplications=force
+WizardStyle=modern
 
 [Tasks]
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked

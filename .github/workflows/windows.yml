@@ -72,6 +72,28 @@ jobs:
           [[ -f "$ISCC" ]] || { choco install innosetup -y --no-progress; }
           "$ISCC" /DAppVersion="$VERSION" packaging/windows/clippy.iss
 
+      - name: Installer screenshots
+        shell: pwsh
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+          New-Item -ItemType Directory screenshots | Out-Null
+          $setup = Start-Process (Get-ChildItem dist\ClippySetup-*.exe).FullName -PassThru
+          $b = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          foreach ($i in 1..4) {
+            Start-Sleep 4
+            $bmp = New-Object System.Drawing.Bitmap $b.Width, $b.Height
+            [System.Drawing.Graphics]::FromImage($bmp).CopyFromScreen($b.Location, [System.Drawing.Point]::Empty, $b.Size)
+            $bmp.Save("screenshots\page$i.png")
+            (New-Object -ComObject WScript.Shell).AppActivate($setup.Id) | Out-Null
+            [System.Windows.Forms.SendKeys]::SendWait("{ENTER}")
+          }
+          Stop-Process $setup -ErrorAction SilentlyContinue
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installer-screenshots
+          path: screenshots/
+
       - uses: actions/upload-artifact@v4
         with:
           name: ClippySetup
