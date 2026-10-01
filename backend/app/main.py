@@ -7,11 +7,12 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import inspect, update
 
-from backend.app.config import settings
+from backend.app.config import resource_dir, settings
 from backend.app.database import sync_engine, Base
 from backend.app.models import *
 from backend.app.queue.worker import worker
 from backend.app.watcher.clip_watcher import watch_clips_directory
+from backend.app import recorder as native_recorder
 from backend.app.api import clips, tags, recorder, mix_presets, tracks, export, jobs, settings as settings_api
 
 import logging
@@ -30,7 +31,7 @@ def _migrate():
     from alembic import command
     from alembic.config import Config
     cfg = Config()
-    cfg.set_main_option("script_location", str(Path(__file__).resolve().parents[2] / "alembic"))
+    cfg.set_main_option("script_location", str(resource_dir / "alembic"))
     if inspect(sync_engine).has_table("alembic_version"):
         command.upgrade(cfg, "head")
         Base.metadata.create_all(bind=sync_engine)
@@ -63,10 +64,12 @@ async def lifespan(app: FastAPI):
     # Start watcher task
     watcher_stop_event = asyncio.Event()
     watcher_task = asyncio.create_task(watch_clips_directory(watcher_stop_event))
+    native_recorder.startup()
 
     yield
 
     # Teardown
+    native_recorder.shutdown()
     worker.stop()
     watcher_stop_event.set()
     watcher_task.cancel()
@@ -100,6 +103,6 @@ app.include_router(jobs.router)
 app.include_router(settings_api.router)
 
 # Mount frontend production build if available
-frontend_dist = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist"
+frontend_dist = resource_dir / "frontend" / "dist"
 if frontend_dist.exists() and frontend_dist.is_dir():
     app.mount("/", StaticFiles(directory=str(frontend_dist), html=True), name="frontend")

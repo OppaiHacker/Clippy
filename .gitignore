@@ -26,3 +26,7 @@ graphify-out/
 .vscode/
 .idea/
 .DS_Store
+
+# Windows packaging
+/bin/
+/packaging/windows/clippy.ico

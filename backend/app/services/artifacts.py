@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import time
 from pathlib import Path
 
 from backend.app.config import settings
@@ -22,6 +23,17 @@ def tmp_path(out_path: Path) -> Path:
     return out_path.with_name(f".tmp-{os.getpid()}-{out_path.name}")
 
 
+def replace_file(src: Path, dst: Path) -> None:
+    # Windows refuses to replace a file that is open (e.g. being streamed): retry briefly
+    for attempt in range(10):
+        try:
+            return os.replace(src, dst)
+        except PermissionError:
+            if attempt == 9:
+                raise
+            time.sleep(0.2)
+
+
 def ffmpeg_atomic(args: list[str], out_path: Path) -> Path:
     """
     ffmpeg writes to a temp file, then renames it. An interrupted write leaves no
@@ -33,7 +45,7 @@ def ffmpeg_atomic(args: list[str], out_path: Path) -> Path:
         res = subprocess.run(["ffmpeg", "-v", "error", "-y", *args, str(tmp)], capture_output=True, text=True)
         if res.returncode != 0:
             raise RuntimeError(f"ffmpeg -> {out_path.name} failed ({res.returncode}): {res.stderr.strip()[-400:]}")
-        os.replace(tmp, out_path)
+        replace_file(tmp, out_path)
     finally:
         tmp.unlink(missing_ok=True)
     return out_path

@@ -1,0 +1,78 @@
+name: windows
+
+on:
+  push:
+    branches: [windows]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write  # release upload on tags
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+      - name: Build frontend
+        working-directory: frontend
+        run: bun install --frozen-lockfile && bun run build
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --group build
+      - run: uv run pytest -q
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+      - run: cargo build --release --manifest-path native/clippy-audio/Cargo.toml
+
+      - name: Collect bin/ (ffmpeg, ffprobe, clippy-audio)
+        run: |
+          mkdir bin
+          curl -fL -o ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n7.1-latest-win64-gpl-7.1.zip
+          7z x ffmpeg.zip -offmpeg-extract
+          cp ffmpeg-extract/*/bin/ffmpeg.exe ffmpeg-extract/*/bin/ffprobe.exe bin/
+          cp native/clippy-audio/target/release/clippy-audio.exe bin/
+          bin/ffmpeg.exe -hide_banner -encoders | grep -E "h264_nvenc|h264_amf|h264_qsv|libopus"
+          bin/ffmpeg.exe -hide_banner -filters | grep ddagrab
+
+      - name: Build exe
+        run: |
+          uv run python -c "from backend.launcher import icon_image; icon_image(256).save('packaging/windows/clippy.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(256,256)])"
+          uv run pyinstaller --noconfirm packaging/windows/clippy.spec
+
+      - name: Smoke test
+        shell: pwsh
+        env:
+          WORK_DIR: ${{ runner.temp }}\clippy-smoke
+          CLIPS_DIR: ${{ runner.temp }}\clippy-smoke\clips
+        run: |
+          $p = Start-Process dist\Clippy\Clippy.exe -ArgumentList "--smoke" -Wait -PassThru
+          Get-Content "$env:WORK_DIR\clippy.log" -Tail 30
+          exit $p.ExitCode
+
+      - name: Build installer
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          [[ "$GITHUB_REF_TYPE" == tag ]] || VERSION="0.0.0-${GITHUB_SHA::7}"
+          ISCC="C:/Program Files (x86)/Inno Setup 6/ISCC.exe"
+          [[ -f "$ISCC" ]] || { choco install innosetup -y --no-progress; }
+          "$ISCC" /DAppVersion="$VERSION" packaging/windows/clippy.iss
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClippySetup
+          path: dist/ClippySetup-*.exe
+
+      - uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v')
+        with:
+          files: dist/ClippySetup-*.exe

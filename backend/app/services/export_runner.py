@@ -1,5 +1,6 @@
 import re
 import subprocess
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -73,11 +74,13 @@ def run_export_job(job_id: int):
         # Add progress pipe
         cmd.extend(["-progress", "pipe:1"])
 
+        # a pipe nobody reads fills up and stalls ffmpeg, so stderr goes to a file
+        stderr_file = tempfile.TemporaryFile("w+", errors="replace")
         try:
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=stderr_file,
                 text=True,
                 bufsize=1
             )
@@ -128,7 +131,8 @@ def run_export_job(job_id: int):
                 db.add(export_entry)
                 db.commit()
             else:
-                stderr = proc.stderr.read() if proc.stderr else "FFmpeg execution failed"
+                stderr_file.seek(0)
+                stderr = stderr_file.read() or "FFmpeg execution failed"
                 job.state = "error"
                 job.error = stderr[-500:] if stderr else "Unknown error"
                 job.finished_at = datetime.now(timezone.utc)
@@ -144,3 +148,5 @@ def run_export_job(job_id: int):
             db.commit()
             if tmp_output_path.exists():
                 tmp_output_path.unlink()
+        finally:
+            stderr_file.close()

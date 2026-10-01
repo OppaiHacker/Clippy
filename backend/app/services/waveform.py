@@ -1,10 +1,9 @@
 import json
-import os
 import subprocess
 from pathlib import Path
 import numpy as np
 from backend.app.config import settings
-from backend.app.services.artifacts import is_fresh, tmp_path
+from backend.app.services.artifacts import is_fresh, replace_file, tmp_path
 
 def generate_waveform(demuxed_path: Path, clip_id: int, stream_index: int, target_points: int = 2000) -> Path:
     out_path = settings.waveforms_dir / f"{clip_id}_track_{stream_index}.json"
@@ -48,5 +47,5 @@ def generate_waveform(demuxed_path: Path, clip_id: int, stream_index: int, targe
     tmp = tmp_path(out_path)
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump({"points": target_points, "peaks": peaks}, f)
-    os.replace(tmp, out_path)
+    replace_file(tmp, out_path)
     return out_path

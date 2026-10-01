@@ -102,12 +102,13 @@ The mix document is the contract. The browser renders it through `AudioContext` 
 <p>
   <img src="https://img.shields.io/badge/Arch_Linux-supported-1793D1?style=flat-square&logo=archlinux&logoColor=white" alt="Arch Linux — supported">
   <img src="https://img.shields.io/badge/other_distros-untested-6c778f?style=flat-square&logo=linux&logoColor=white" alt="Other distros — untested">
-  <img src="https://img.shields.io/badge/Windows_·_macOS-unsupported-3b4557?style=flat-square" alt="Windows and macOS — unsupported">
+  <img src="https://img.shields.io/badge/Windows-supported-0078D4?style=flat-square" alt="Windows — supported">
+  <img src="https://img.shields.io/badge/macOS-unsupported-3b4557?style=flat-square" alt="macOS — unsupported">
 </p>
 
 Arch is the only distribution this is developed and tested on. Nothing in the code is Arch-specific — it is Python, ffmpeg and Postgres — so any modern Linux with the right package versions will almost certainly work. It is just not verified, and bug reports from elsewhere are handled on a best-effort basis.
 
-Windows and macOS are out of scope: the recorder half of the workflow (`gpu-screen-recorder` in replay mode, driven by Wayland compositor hotkeys) does not exist there.
+Windows has its own native recorder, see [Windows](#windows). macOS is out of scope: there is no recorder half for it.
 
 ### Software
 
@@ -164,6 +165,16 @@ Open **http://localhost:8723**. The image builds the frontend itself. Two limits
 
 - **No GPU.** The compose file does not pass a GPU through, so exports that re-encode (`h264_nvenc`) fail. Add an NVIDIA device reservation and the NVIDIA Container Toolkit if you need them.
 - **The recorder cannot be started from the UI.** The container shares the host PID namespace, so status, save and stop reach the host's `gpu-screen-recorder`, but start has to happen on the host (hotkey or `gsr-replay start`).
+
+---
+
+## Windows
+
+Grab `ClippySetup-<version>.exe` from [Releases](../../releases) and run it. It installs per user, no admin needed. Clippy lives in the system tray (Open / Quit) and the UI opens at `http://127.0.0.1:8723`.
+
+- **Data:** database, thumbnails and logs in `%LOCALAPPDATA%\Clippy` (uninstalling keeps them), clips in `%USERPROFILE%\Videos\Clippy`. No Docker, no Postgres: it is a single SQLite file.
+- **SmartScreen:** the installer is unsigned, so Windows warns about an unknown publisher. "More info" then "Run anyway".
+- **Recorder:** built in, needs Windows 10 2004 or newer. The replay buffer is kept in RAM, hotkeys are set in the sidebar, and every app gets its own audio track. Encodes on NVIDIA (NVENC), AMD (AMF) or Intel (QSV).
 
 ---
 

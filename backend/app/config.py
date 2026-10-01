@@ -8,18 +8,22 @@ WINDOWS = sys.platform == "win32"
 DEFAULT_WORK_DIR = (Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData/Local")) / "Clippy"
                     if WINDOWS else Path.home() / ".local/share/clippy")
 
+FROZEN = getattr(sys, "frozen", False)
+# PyInstaller unpacks data files (frontend dist, alembic, bin) under _MEIPASS
+resource_dir = Path(sys._MEIPASS) if FROZEN else Path(__file__).resolve().parents[2]
+
 class Settings(BaseSettings):
     # Linux: Postgres from docker compose. Windows: no Docker, one SQLite file in work_dir.
     # Empty = the platform default, filled in below once work_dir is known.
     database_url: str = "" if WINDOWS else "postgresql+asyncpg://clippy:clippy@localhost:5434/clippy"
     sync_database_url: str = "" if WINDOWS else "postgresql+psycopg2://clippy:clippy@localhost:5434/clippy"
     
-    clips_dir: Path = Path.home() / "Videos/clips"
+    clips_dir: Path = Path.home() / ("Videos/Clippy" if WINDOWS else "Videos/clips")
     work_dir: Path = DEFAULT_WORK_DIR
     
     gsr_script: Path = Path.home() / ".local/bin/gsr-replay"
     
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file=DEFAULT_WORK_DIR / ".env" if FROZEN else ".env", env_file_encoding="utf-8", extra="ignore")
 
     @model_validator(mode="after")
     def default_sqlite(self):
