@@ -30,6 +30,7 @@ jobs:
       - name: Tests
         run: |
           # failures as annotations: those are readable without access to the job log
+          set +eo pipefail  # Actions runs bash with -eo pipefail, which would exit before the tail below
           uv run pytest -q -rfE --tb=line 2>&1 | tee pytest.log; rc=${PIPESTATUS[0]}
           [[ $rc == 0 ]] || { tail -n 40 pytest.log | sed 's/^/::error::/'; exit $rc; }
 
