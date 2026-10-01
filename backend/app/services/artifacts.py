@@ -1,5 +1,6 @@
 import logging
 import os
+import stat
 import subprocess
 import time
 from pathlib import Path
@@ -31,6 +32,9 @@ def replace_file(src: Path, dst: Path) -> None:
         except PermissionError:
             if attempt == 9:
                 raise
+            # Windows also refuses a read-only target, which Linux replaces just fine
+            if os.name == "nt" and dst.exists():
+                os.chmod(dst, stat.S_IWRITE)
             time.sleep(0.2)
 
 
