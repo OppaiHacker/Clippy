@@ -31,7 +31,7 @@ jobs:
         run: |
           # failures as annotations: those are readable without access to the job log
           uv run pytest -q -rfE --tb=line 2>&1 | tee pytest.log; rc=${PIPESTATUS[0]}
-          [[ $rc == 0 ]] || { grep -E "^(FAILED|ERROR)|Error|assert" pytest.log | head -30 | sed 's/^/::error::/'; exit $rc; }
+          [[ $rc == 0 ]] || { tail -n 40 pytest.log | sed 's/^/::error::/'; exit $rc; }
 
       - uses: dtolnay/rust-toolchain@stable
         with:
