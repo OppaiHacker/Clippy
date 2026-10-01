@@ -92,7 +92,7 @@ const ramEstimateGb = (c: RecorderConfig) => ((c.buffer / 300) * (c.fps / 60)).t
               <div class="p-2 rounded-lg bg-accent-dim text-accent border border-accent/20"><Settings :size="18" /></div>
               <div>
                 <h2 id="rec-settings-title" class="text-base font-bold text-text">Recorder settings</h2>
-                <p class="text-xs text-text-3">gpu-screen-recorder replay buffer and Hyprland hotkeys</p>
+                <p class="text-xs text-text-3">Replay buffer and global hotkeys</p>
               </div>
             </div>
             <button @click="emit('close')" class="p-1.5 rounded-lg text-text-3 hover:text-text hover:bg-surface-3 cursor-pointer" title="Close">
@@ -131,6 +131,25 @@ const ramEstimateGb = (c: RecorderConfig) => ((c.buffer / 300) * (c.fps / 60)).t
                        class="h-7 w-20 bg-surface-2 border border-border rounded-md px-2 text-[11px] font-mono text-text focus:border-accent/60 focus:outline-none" />
               </div>
               <p class="mt-1 text-[10px] text-text-3 mono-num">≈ {{ ramEstimateGb(cfg) }} GB RAM at {{ cfg.fps }} fps (rough, depends on the scene)</p>
+            </div>
+
+            <!-- Windows engine -->
+            <div v-if="cfg.platform === 'windows'" class="space-y-2">
+              <div class="text-[11px] uppercase tracking-wider text-text-3">Audio tracks and screen</div>
+              <label v-for="[key, label] in ([['voice_app', 'Voice chat app'], ['browser_app', 'Browser']] as const)" :key="key" class="flex items-center justify-between gap-3">
+                <span class="text-xs text-text-2">{{ label }}</span>
+                <input v-model="cfg[key]" placeholder="Discord.exe" pattern="[A-Za-z0-9_.\-]{1,64}"
+                       class="h-7 w-40 bg-surface-2 border border-border rounded-md px-2 text-[11px] font-mono text-text focus:border-accent/60 focus:outline-none" />
+              </label>
+              <label class="flex items-center justify-between gap-3">
+                <span class="text-xs text-text-2">Monitor (0 = first)</span>
+                <input v-model.number="cfg.monitor" type="number" min="0" max="15"
+                       class="h-7 w-20 bg-surface-2 border border-border rounded-md px-2 text-[11px] font-mono text-text focus:border-accent/60 focus:outline-none" />
+              </label>
+              <label class="flex items-center justify-between gap-3 cursor-pointer">
+                <span class="text-xs text-text-2">Start the buffer with Clippy</span>
+                <input v-model="cfg.autostart" type="checkbox" />
+              </label>
             </div>
 
             <!-- Binds -->

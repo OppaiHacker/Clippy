@@ -50,7 +50,7 @@ def classify_track_kind(tag_name: str) -> tuple[str, str]:
     if raw_name.startswith("Applications:"):
         app_name = raw_name.replace("Applications:", "").strip()
         # humanize common apps
-        if app_name.lower() == "vesktop" or app_name.lower() == "discord":
+        if app_name.lower().removesuffix(".exe") in ("vesktop", "discord"):
             return "app", "Discord"
         return "app", app_name
     

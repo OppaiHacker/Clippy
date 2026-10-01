@@ -141,4 +141,10 @@ export interface RecorderConfig {
   buffer: number;
   // Hyprland combos like "ALT + SHIFT + F10"; "" = no bind
   binds: Record<RecorderBindAction, string>;
+  // Windows engine only; `platform` comes from the GET response
+  platform?: 'windows' | 'linux';
+  voice_app?: string;
+  browser_app?: string;
+  monitor?: number;
+  autostart?: boolean;
 }
