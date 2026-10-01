@@ -148,7 +148,7 @@ def read_config() -> RecorderConfig:
     if not RECORDER_CONF.exists():
         return cfg
     raw = {}
-    for line in RECORDER_CONF.read_text().splitlines():
+    for line in RECORDER_CONF.read_text(encoding="utf-8").splitlines():
         key, sep, val = line.partition("=")
         if sep:
             raw[key.strip()] = val.strip().strip('"')
@@ -171,7 +171,7 @@ def put_recorder_config(cfg: RecorderConfig):
     lines += [f'BIND_{a.upper()}="{cfg.binds[a]}"' for a in BIND_ACTIONS]
     if WIN:
         lines += [f"VOICE_APP={cfg.voice_app}", f"BROWSER_APP={cfg.browser_app}", f"MONITOR={cfg.monitor}", f"AUTOSTART={int(cfg.autostart)}"]
-    RECORDER_CONF.write_text("# written by Clippy (sidebar → recorder settings)\n" + "\n".join(lines) + "\n")
+    RECORDER_CONF.write_text("# written by Clippy (sidebar → recorder settings)\n" + "\n".join(lines) + "\n", encoding="utf-8")
     if WIN:
         recorder.rebind(cfg)
         if engine.running:  # new fps/buffer/apps only apply to a fresh ffmpeg; this drops the buffer

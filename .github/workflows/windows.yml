@@ -36,7 +36,7 @@ jobs:
           cp ffmpeg-extract/*/bin/ffmpeg.exe ffmpeg-extract/*/bin/ffprobe.exe bin/
           bin/ffmpeg.exe -hide_banner -encoders | grep -E "h264_nvenc|h264_amf|h264_qsv|libopus"
           bin/ffmpeg.exe -hide_banner -filters | grep ddagrab
-          echo "$PWD/bin" >> "$GITHUB_PATH"
+          cygpath -w "$PWD/bin" >> "$GITHUB_PATH"  # a /d/a/... path means nothing to Windows Python
 
       - name: Tests
         run: |
