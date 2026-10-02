@@ -4,6 +4,8 @@ use std::mem::size_of;
 use std::time::{Duration, Instant};
 use windows::core::{implement, Interface, Ref, Result, HRESULT, PCWSTR, PWSTR};
 use windows::Win32::Foundation::*;
+use windows::Win32::Graphics::Dxgi::*;
+use windows::Win32::Graphics::Gdi::{EnumDisplayDevicesW, DISPLAY_DEVICEW};
 use windows::Win32::Media::Audio::*;
 use windows::Win32::Storage::FileSystem::{WriteFile, PIPE_ACCESS_OUTBOUND};
 use windows::Win32::System::Com::StructuredStorage::*;
@@ -32,8 +34,38 @@ fn run_inner(cmd: Cmd) -> Result<()> {
             println!("{}", json_list(&list_sessions()?));
             Ok(())
         }
+        Cmd::Monitors => {
+            println!("{}", json_monitors(&monitors()?));
+            Ok(())
+        }
         Cmd::Capture { pipe, src } => capture(&pipe, &src),
     }
+}
+
+fn wstr(w: &[u16]) -> String {
+    String::from_utf16_lossy(&w[..w.iter().position(|&c| c == 0).unwrap_or(w.len())])
+}
+
+/// Outputs of adapter 0, the one ffmpeg's ddagrab opens by default, so the index is its output_idx.
+// ponytail: monitors wired to another GPU (hybrid laptops) are not listed; ddagrab would need that adapter's device
+fn monitors() -> Result<Vec<(String, i32, i32, bool)>> {
+    let mut v = Vec::new();
+    unsafe {
+        let adapter = CreateDXGIFactory1::<IDXGIFactory1>()?.EnumAdapters1(0)?;
+        while let Ok(out) = adapter.EnumOutputs(v.len() as u32) {
+            let d = out.GetDesc()?;
+            let r = d.DesktopCoordinates;
+            let mut dd = DISPLAY_DEVICEW { cb: size_of::<DISPLAY_DEVICEW>() as u32, ..Default::default() };
+            let name = if EnumDisplayDevicesW(PCWSTR(d.DeviceName.as_ptr()), 0, &mut dd, 0).as_bool() {
+                wstr(&dd.DeviceString)
+            } else {
+                wstr(&d.DeviceName)
+            };
+            // the primary monitor is the one at the desktop origin
+            v.push((name, r.right - r.left, r.bottom - r.top, r.left == 0 && r.top == 0));
+        }
+    }
+    Ok(v)
 }
 
 fn processes() -> Vec<Proc> {
@@ -43,8 +75,7 @@ fn processes() -> Vec<Proc> {
         let mut e = PROCESSENTRY32W { dwSize: size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
         let mut ok = Process32FirstW(snap, &mut e).is_ok();
         while ok {
-            let n = e.szExeFile.iter().position(|&c| c == 0).unwrap_or(e.szExeFile.len());
-            v.push(Proc { pid: e.th32ProcessID, ppid: e.th32ParentProcessID, name: String::from_utf16_lossy(&e.szExeFile[..n]) });
+            v.push(Proc { pid: e.th32ProcessID, ppid: e.th32ParentProcessID, name: wstr(&e.szExeFile) });
             ok = Process32NextW(snap, &mut e).is_ok();
         }
         let _ = CloseHandle(snap);

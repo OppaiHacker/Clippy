@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, field_validator
 from backend.app.config import settings
 from backend.app import recorder
 from backend.app.recorder import engine, hotkeys
+from backend.app.recorder.engine import default_browser, monitors
 
 WIN = sys.platform == "win32"
 logger = logging.getLogger(__name__)
@@ -123,7 +124,14 @@ EXE_NAME = r"^[A-Za-z0-9_.\-]{1,64}$"
 class RecorderConfig(BaseModel):
     fps: int = Field(60 if WIN else 180, ge=10, le=500)
     buffer: int = Field(300, ge=10, le=1800)
+    # ALT + F9 / F10 belong to NVIDIA ShadowPlay on Windows, so the Windows binds add CTRL
     binds: dict[str, str] = {
+        "toggle": "CTRL + ALT + F9",
+        "save_10": "CTRL + SHIFT + F10",
+        "save_30": "CTRL + ALT + SHIFT + F10",
+        "save_60": "CTRL + ALT + F10",
+        "save_full": "CTRL + ALT + F11",
+    } if WIN else {
         "toggle": "ALT + F9",
         "save_10": "ALT + SUPER + F10",
         "save_30": "ALT + SHIFT + F10",
@@ -133,8 +141,8 @@ class RecorderConfig(BaseModel):
 
     # Windows only
     voice_app: str = Field("Discord.exe", pattern=EXE_NAME)
-    browser_app: str = Field("chrome.exe", pattern=EXE_NAME)
-    monitor: int = Field(0, ge=0, le=15)
+    browser_app: str = Field("", pattern=f"^$|{EXE_NAME}")  # "" = the default browser
+    monitor: int = Field(-1, ge=-1, le=15)  # -1 = the primary monitor
     autostart: bool = True
 
     @field_validator("binds")
@@ -170,7 +178,14 @@ def read_config() -> RecorderConfig:
 
 @router.get("/config")
 def get_recorder_config():
-    return {**read_config().model_dump(), "platform": "windows" if WIN else "linux"}
+    extra = {"default_browser": default_browser()} if WIN else {}
+    return {**read_config().model_dump(), "platform": "windows" if WIN else "linux", **extra}
+
+
+@router.get("/monitors")
+def get_monitors():
+    """Screens ddagrab can capture, in output_idx order."""
+    return monitors()
 
 
 @router.put("/config")

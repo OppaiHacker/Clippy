@@ -1,4 +1,4 @@
-import { Clip, MixDocument, TagItem, Job, ExportItem, RecorderStatus, RecorderConfig } from '../types';
+import { Clip, MixDocument, TagItem, Job, ExportItem, RecorderStatus, RecorderConfig, RecorderMonitor } from '../types';
 
 const API_BASE = '/api';
 
@@ -113,6 +113,11 @@ export async function fetchRecorderConfig(): Promise<RecorderConfig> {
   const res = await fetch(`${API_BASE}/recorder/config`);
   if (!res.ok) throw new Error('Failed to fetch recorder config');
   return res.json();
+}
+
+export async function fetchRecorderMonitors(): Promise<RecorderMonitor[]> {
+  const res = await fetch(`${API_BASE}/recorder/monitors`);
+  return res.ok ? res.json() : [];
 }
 
 export async function saveRecorderConfig(cfg: RecorderConfig): Promise<{ config: RecorderConfig; recorder: RecorderStatus }> {

@@ -29,6 +29,10 @@ WizardSmallImageFile=art\small-*.bmp
 Name: desktopicon; Description: "Create a desktop shortcut"; Flags: unchecked
 Name: autostart; Description: "Start Clippy with Windows"; Flags: unchecked
 
+[InstallDelete]
+; an update over an older version must not keep its stale Python modules and DLLs (user data lives in %LOCALAPPDATA%\Clippy)
+Type: filesandordirs; Name: "{app}\_internal"
+
 [Files]
 Source: "art\wizard-*.bmp"; Flags: dontcopy
 Source: "..\..\dist\Clippy\*"; DestDir: "{app}"; Flags: recursesubdirs ignoreversion

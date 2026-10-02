@@ -146,7 +146,15 @@ export interface RecorderConfig {
   // Windows engine only; `platform` comes from the GET response
   platform?: 'windows' | 'linux';
   voice_app?: string;
-  browser_app?: string;
-  monitor?: number;
+  browser_app?: string; // "" = the default browser
+  monitor?: number; // -1 = the primary monitor
+  default_browser?: string | null;
   autostart?: boolean;
+}
+
+export interface RecorderMonitor {
+  name: string;
+  width: number;
+  height: number;
+  primary: boolean;
 }

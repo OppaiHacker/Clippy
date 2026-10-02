@@ -17,12 +17,14 @@ pub enum Source {
 #[derive(Debug, PartialEq)]
 pub enum Cmd {
     List,
+    Monitors,
     Capture { pipe: String, src: Source },
 }
 
 pub fn parse_args(args: &[String]) -> Result<Cmd, String> {
     match args.first().map(String::as_str) {
         Some("list") if args.len() == 1 => Ok(Cmd::List),
+        Some("monitors") if args.len() == 1 => Ok(Cmd::Monitors),
         Some("capture") => {
             let (mut pipe, mut src) = (None, None);
             let mut it = args[1..].iter();
@@ -48,7 +50,7 @@ pub fn parse_args(args: &[String]) -> Result<Cmd, String> {
                 _ => Err("capture needs --pipe NAME and one source".into()),
             }
         }
-        _ => Err("usage: clippy-audio list | capture --pipe NAME (--system|--mic|--include EXE|--exclude EXE)".into()),
+        _ => Err("usage: clippy-audio list | monitors | capture --pipe NAME (--system|--mic|--include EXE|--exclude EXE)".into()),
     }
 }
 
@@ -105,13 +107,23 @@ pub fn dedup_by_name(mut v: Vec<(u32, String, u32)>) -> Vec<(u32, String)> {
     v.into_iter().map(|(p, n, _)| (p, n)).collect()
 }
 
+fn json_str(s: &str) -> String {
+    format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
+}
+
+/// DXGI outputs of the default adapter, in ddagrab `output_idx` order: (name, width, height, primary).
+pub fn json_monitors(v: &[(String, i32, i32, bool)]) -> String {
+    let items: Vec<String> = v
+        .iter()
+        .map(|(n, w, h, p)| format!("{{\"name\": {}, \"width\": {w}, \"height\": {h}, \"primary\": {p}}}", json_str(n)))
+        .collect();
+    format!("[{}]", items.join(", "))
+}
+
 pub fn json_list(v: &[(u32, String)]) -> String {
     let items: Vec<String> = v
         .iter()
-        .map(|(p, n)| {
-            let n = n.replace('\\', "\\\\").replace('"', "\\\"");
-            format!("{{\"pid\": {p}, \"name\": \"{n}\"}}")
-        })
+        .map(|(p, n)| format!("{{\"pid\": {p}, \"name\": {}}}", json_str(n)))
         .collect();
     format!("[{}]", items.join(", "))
 }
@@ -130,6 +142,7 @@ mod tests {
     #[test]
     fn args() {
         assert_eq!(parse_args(&a("list")), Ok(Cmd::List));
+        assert_eq!(parse_args(&a("monitors")), Ok(Cmd::Monitors));
         assert_eq!(
             parse_args(&a("capture --pipe x --include Discord.exe")),
             Ok(Cmd::Capture { pipe: "x".into(), src: Source::Include("Discord.exe".into()) })
@@ -160,6 +173,10 @@ mod tests {
         assert_eq!(depth(&ps, 12), 3);
         let d = dedup_by_name(vec![(12, "Discord.exe".into(), 3), (10, "Discord.exe".into(), 1), (1, "a.exe".into(), 0)]);
         assert_eq!(d, vec![(1, "a.exe".to_string()), (10, "Discord.exe".to_string())]);
+        assert_eq!(
+            json_monitors(&[("Dell \"U\"".into(), 2560, 1440, true)]),
+            r#"[{"name": "Dell \"U\"", "width": 2560, "height": 1440, "primary": true}]"#
+        );
         assert_eq!(json_list(&d), r#"[{"pid": 1, "name": "a.exe"}, {"pid": 10, "name": "Discord.exe"}]"#);
     }
 }

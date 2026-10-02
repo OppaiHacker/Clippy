@@ -82,15 +82,21 @@ async def _handle_batch(changes: set) -> None:
 
 async def watch_clips_directory(stop_event: asyncio.Event):
     clips_dir = settings.clips_dir
+    waited = False
     # the watcher must not die for good because of an unmounted drive or a single exception
     while not stop_event.is_set():
         if not clips_dir.is_dir():
             logger.warning(f"Clips directory {clips_dir} does not exist yet. Watcher waiting...")
+            waited = True
             try:
                 await asyncio.wait_for(stop_event.wait(), timeout=10)
             except asyncio.TimeoutError:
                 pass
             continue
+        if waited:  # clips saved before the folder showed up (the recorder creates it on its first save)
+            waited = False
+            from backend.cli import scan_clips
+            await asyncio.get_running_loop().run_in_executor(None, scan_clips)
 
         logger.info(f"Starting clip watcher on {clips_dir}")
         try:

@@ -156,7 +156,7 @@ def ingest_clip(clip_path: Path, db: Session) -> Clip:
 
         # one broken track must not block the whole clip
         try:
-            demux_file = demux_track(clip_path, clip.id, audio_info.stream_index, audio_info.audio_index)
+            demux_file = demux_track(clip_path, clip.id, audio_info.stream_index, audio_info.audio_index, audio_info.codec)
             track.demuxed_path = str(demux_file)
         except Exception as e:
             track.demuxed_path = None

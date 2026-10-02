@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { X, Settings, RefreshCw } from 'lucide-vue-next';
-import { fetchRecorderConfig, saveRecorderConfig } from '../api/client';
-import { RecorderBindAction, RecorderConfig, RecorderStatus } from '../types';
+import { fetchRecorderConfig, fetchRecorderMonitors, saveRecorderConfig } from '../api/client';
+import { RecorderBindAction, RecorderConfig, RecorderMonitor, RecorderStatus } from '../types';
 
 const props = defineProps<{ isOpen: boolean; running: boolean }>();
 const emit = defineEmits<{
@@ -14,6 +14,7 @@ const cfg = ref<RecorderConfig | null>(null);
 const saving = ref(false);
 const error = ref('');
 const capturing = ref<RecorderBindAction | null>(null);
+const monitors = ref<RecorderMonitor[]>([]);
 
 const FPS_PRESETS = [30, 60, 120, 144, 165, 180, 240];
 const BIND_LABELS: [RecorderBindAction, string][] = [
@@ -30,6 +31,7 @@ watch(() => props.isOpen, async open => {
   capturing.value = null;
   try {
     cfg.value = await fetchRecorderConfig();
+    if (cfg.value.platform === 'windows') monitors.value = await fetchRecorderMonitors();
   } catch (e) {
     error.value = String(e);
   }
@@ -136,15 +138,26 @@ const ramEstimateGb = (c: RecorderConfig) => ((c.buffer / 300) * (c.fps / 60)).t
             <!-- Windows engine -->
             <div v-if="cfg.platform === 'windows'" class="space-y-2">
               <div class="text-[11px] uppercase tracking-wider text-text-3">Audio tracks and screen</div>
-              <label v-for="[key, label] in ([['voice_app', 'Voice chat app'], ['browser_app', 'Browser']] as const)" :key="key" class="flex items-center justify-between gap-3">
-                <span class="text-xs text-text-2">{{ label }}</span>
-                <input v-model="cfg[key]" placeholder="Discord.exe" pattern="[A-Za-z0-9_.\-]{1,64}"
+              <label class="flex items-center justify-between gap-3">
+                <span class="text-xs text-text-2">Voice chat app</span>
+                <input v-model="cfg.voice_app" placeholder="Discord.exe" pattern="[A-Za-z0-9_.\-]{1,64}"
                        class="h-7 w-40 bg-surface-2 border border-border rounded-md px-2 text-[11px] font-mono text-text focus:border-accent/60 focus:outline-none" />
               </label>
               <label class="flex items-center justify-between gap-3">
-                <span class="text-xs text-text-2">Monitor (0 = first)</span>
-                <input v-model.number="cfg.monitor" type="number" min="0" max="15"
-                       class="h-7 w-20 bg-surface-2 border border-border rounded-md px-2 text-[11px] font-mono text-text focus:border-accent/60 focus:outline-none" />
+                <span class="text-xs text-text-2">Browser <span class="text-text-3">(empty = default)</span></span>
+                <input v-model="cfg.browser_app" :placeholder="`auto: ${cfg.default_browser || 'chrome.exe'}`" pattern="[A-Za-z0-9_.\-]{0,64}"
+                       class="h-7 w-40 bg-surface-2 border border-border rounded-md px-2 text-[11px] font-mono text-text focus:border-accent/60 focus:outline-none" />
+              </label>
+              <label class="flex items-center justify-between gap-3">
+                <span class="text-xs text-text-2">Monitor</span>
+                <select v-model.number="cfg.monitor"
+                        class="h-7 w-56 bg-surface-2 border border-border rounded-md px-2 text-[11px] text-text focus:border-accent/60 focus:outline-none">
+                  <option :value="-1">Auto (primary)</option>
+                  <option v-for="(m, i) in monitors" :key="i" :value="i">
+                    {{ i + 1 }}: {{ m.name }} · {{ m.width }}×{{ m.height }}{{ m.primary ? ' · primary' : '' }}
+                  </option>
+                  <option v-if="cfg.monitor! >= 0 && cfg.monitor! >= monitors.length" :value="cfg.monitor">Monitor {{ cfg.monitor! + 1 }} (not found)</option>
+                </select>
               </label>
               <label class="flex items-center justify-between gap-3 cursor-pointer">
                 <span class="text-xs text-text-2">Start the buffer with Clippy</span>

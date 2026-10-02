@@ -85,3 +85,17 @@ def test_new_clip_id_purges_foreign_artifacts():
     finally:
         for f in files + [keep]:
             f.unlink(missing_ok=True)
+
+
+def test_aac_track_is_demuxed_to_opus(tmp_path):
+    # the Windows recorder writes AAC, which webm cannot hold as-is
+    from backend.app.services.demux import demux_track
+    clip = tmp_path / "aac.mp4"
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "lavfi", "-i", "sine=d=1", "-c:a", "aac", str(clip)], check=True)
+    out = demux_track(clip, 999998, 1, 0, "aac")
+    try:
+        codec = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "stream=codec_name", "-of", "csv=p=0", str(out)],
+                               capture_output=True, text=True, check=True).stdout.strip()
+        assert codec == "opus"
+    finally:
+        out.unlink(missing_ok=True)

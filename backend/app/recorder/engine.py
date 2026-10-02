@@ -12,7 +12,7 @@ import threading
 import time
 import uuid
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from backend.app.config import settings
 from .ring import Ring
@@ -93,6 +93,49 @@ def foreground_window() -> tuple[str | None, str | None]:
     return exe, title.value or None
 
 
+def _helper_json(*args: str) -> list:
+    helper = shutil.which("clippy-audio")
+    if not helper:
+        return []
+    try:
+        r = subprocess.run([helper, *args], capture_output=True, text=True, timeout=5, creationflags=NO_WINDOW)
+        return json.loads(r.stdout)
+    except Exception:
+        return []
+
+
+def monitors() -> list[dict]:
+    """[{name, width, height, primary}] indexed like ddagrab's output_idx."""
+    return _helper_json("monitors")
+
+
+def primary_monitor() -> int:
+    return next((i for i, m in enumerate(monitors()) if m.get("primary")), 0)
+
+
+def exe_of(command: str) -> str:
+    """'"C:\\Program Files\\...\\msedge.exe" --single-argument %1' -> 'msedge.exe'"""
+    exe = command.split('"')[1] if command.startswith('"') else command.split(" ")[0]
+    return PureWindowsPath(exe).name
+
+
+def default_browser() -> str | None:
+    """exe of the browser that opens https links."""
+    if sys.platform != "win32":
+        return None
+    import winreg
+    assoc = r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\https"
+    for choice in ("UserChoiceLatest", "UserChoice"):  # newer Windows 11 builds write UserChoiceLatest
+        try:
+            with winreg.OpenKey(winreg.HKEY_CURRENT_USER, rf"{assoc}\{choice}") as k:
+                prog_id = winreg.QueryValueEx(k, "ProgId")[0]
+            with winreg.OpenKey(winreg.HKEY_CLASSES_ROOT, rf"{prog_id}\shell\open\command") as k:
+                return exe_of(winreg.QueryValueEx(k, "")[0])
+        except (OSError, IndexError):
+            continue
+    return None
+
+
 def _pipe_ready(name: str) -> bool:
     import ctypes
     return bool(ctypes.WinDLL("kernel32").WaitNamedPipeW(name, 100))  # unlike open(), does not eat the instance
@@ -127,15 +170,17 @@ class Engine:
         err = self.error or (" | ".join(self._stderr) if self.proc else "")
         return "stopped" + (f": {err}" if err else "")
 
-    def _real_inputs(self, cfg):
+    def _real_inputs(self, cfg, monitor: int):
+        video = ["-f", "lavfi", "-i", f"ddagrab=output_idx={monitor}:framerate={cfg.fps}"]
         helper = shutil.which("clippy-audio")
         if not helper:
             self.warning = "clippy-audio not found, recording without audio"
-            return ["-f", "lavfi", "-i", f"ddagrab=output_idx={cfg.monitor}:framerate={cfg.fps}"], [], []
+            return video, [], []
+        browser = cfg.browser_app or default_browser() or "chrome.exe"
         # Process loopback can only EXCLUDE one process tree, so the browser is also on track 1.
         tracks = [(f"All applications except: {cfg.voice_app}", ["--exclude", cfg.voice_app]),
                   (f"Applications: {cfg.voice_app}", ["--include", cfg.voice_app]),
-                  (f"Applications: {cfg.browser_app}", ["--include", cfg.browser_app]),
+                  (f"Applications: {browser}", ["--include", browser]),
                   ("Devices: default_input", ["--mic"])]
         run, audio = uuid.uuid4().hex[:8], []
         for n, (_, flags) in enumerate(tracks):
@@ -151,7 +196,7 @@ class Engine:
             else:
                 raise RuntimeError(f"audio pipe {name} never appeared")
             audio.append(["-f", "f32le", "-ar", "48000", "-ac", "2", "-thread_queue_size", "4096", "-i", rf"\\.\pipe\{name}"])
-        return ["-f", "lavfi", "-i", f"ddagrab=output_idx={cfg.monitor}:framerate={cfg.fps}"], audio, [t for t, _ in tracks]
+        return video, audio, [t for t, _ in tracks]
 
     def start(self, cfg) -> str:
         with self._lock:
@@ -170,8 +215,9 @@ class Engine:
                 video, audio, self.titles = self._inputs
                 self.encoder = "libx264"
             else:
-                self.encoder = pick_encoder(cfg.monitor)
-                video, audio, self.titles = self._real_inputs(cfg)
+                monitor = cfg.monitor if cfg.monitor >= 0 else primary_monitor()
+                self.encoder = pick_encoder(monitor)
+                video, audio, self.titles = self._real_inputs(cfg, monitor)
             self.fps, self.buffer, self.ring, self._cfg = cfg.fps, cfg.buffer, Ring(cfg.buffer), cfg
             self.proc = subprocess.Popen(build_cmd(cfg.fps, video, audio, self.encoder, hw=not self._inputs),
                                          stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -193,6 +239,8 @@ class Engine:
         # ffmpeg quit on its own: a game switched resolution, a UAC prompt took the desktop, a driver reset.
         # Start a fresh one (the old buffer is lost); one that dies right away is a real error and stays stopped.
         if time.monotonic() - started < self.RESTART_AFTER:
+            if self.proc is proc:
+                logger.error("ffmpeg quit right after start: %s", " | ".join(self._stderr))
             return
         time.sleep(1)
         with self._lock:
@@ -264,14 +312,7 @@ class Engine:
 
     @staticmethod
     def _audio_apps() -> list[str]:
-        helper = shutil.which("clippy-audio")
-        if not helper:
-            return []
-        try:
-            r = subprocess.run([helper, "list"], capture_output=True, text=True, timeout=5, creationflags=NO_WINDOW)
-            return [a["name"] for a in json.loads(r.stdout)]
-        except Exception:
-            return []
+        return [a["name"] for a in _helper_json("list")]
 
 
 engine = Engine()

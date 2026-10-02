@@ -129,3 +129,9 @@ def test_engine_does_not_start_after_close():
     eng.close()
     eng.start(SimpleNamespace(fps=10, buffer=30))
     assert eng.proc is None
+
+
+def test_exe_of_browser_command():
+    from backend.app.recorder.engine import exe_of
+    assert exe_of('"C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe" --single-argument %1') == "msedge.exe"
+    assert exe_of("C:\\Firefox\\firefox.exe -osint -url %1") == "firefox.exe"
