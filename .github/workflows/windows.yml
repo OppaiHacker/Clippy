@@ -77,7 +77,8 @@ jobs:
           # MSYS would rewrite /DAppVersion=... into a path
           MSYS_NO_PATHCONV=1 "$ISCC" /DAppVersion="$VERSION" packaging/windows/clippy.iss > iscc.log 2>&1; rc=$?
           cat iscc.log
-          [[ $rc == 0 ]] || { tail -n 25 iscc.log | sed 's/^/::error::/'; exit $rc; }
+          # annotations are capped per step, so the compiler's error line goes first
+          [[ $rc == 0 ]] || { { grep -iE "error|line [0-9]+" iscc.log | tail -n 3; tail -n 6 iscc.log; } | sed 's/^/::error::/'; exit $rc; }
 
       - name: Installer screenshots
         shell: pwsh
