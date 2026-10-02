@@ -170,11 +170,71 @@ Open **http://localhost:8723**. The image builds the frontend itself. Two limits
 
 ## Windows
 
-Grab `ClippySetup-<version>.exe` from [Releases](../../releases) and run it. It installs per user, no admin needed. Clippy lives in the system tray (Open / Quit) and the UI opens at `http://127.0.0.1:8723`.
+This branch ships a standalone Windows build: one installer, no Docker, no Postgres, no `gpu-screen-recorder`. The recorder is native.
 
-- **Data:** database, thumbnails and logs in `%LOCALAPPDATA%\Clippy` (uninstalling keeps them), clips in `%USERPROFILE%\Videos\Clippy`. No Docker, no Postgres: it is a single SQLite file.
+Grab `ClippySetup-<version>.exe` from [Releases](../../releases) and run it. It installs per user, no admin needed. Optional tasks: desktop shortcut, start with Windows (tray only, no browser tab). Clippy lives in the system tray (Open / Quit) and the UI opens at `http://127.0.0.1:8723`.
+
+### Requirements
+
+- Windows 10 2004 or newer, 64-bit.
+- Any GPU with a hardware H.264 encoder: NVIDIA (NVENC), AMD (AMF) or Intel (QSV).
+- ffmpeg, ffprobe and the audio helper are bundled. Nothing else to install.
+
+### Where things live
+
+| What | Where |
+|---|---|
+| Database (SQLite), thumbnails, waveforms, exports, `clippy.log` | `%LOCALAPPDATA%\Clippy` (uninstalling keeps it) |
+| Clips | `%USERPROFILE%\Videos\Clippy` |
+| Recorder settings | `%LOCALAPPDATA%\Clippy\recorder.env` |
+| Overrides (`CLIPS_DIR`, `WORK_DIR`, `DATABASE_URL`) | `%LOCALAPPDATA%\Clippy\.env` |
+
+Set `DATABASE_URL` and `SYNC_DATABASE_URL` only if you want Postgres instead of SQLite.
+
+### Recorder
+
+Built in, off the same sidebar widget as on Linux. `ffmpeg` captures the screen (`ddagrab`), a small Rust helper (`clippy-audio`) captures WASAPI audio per process, and the replay buffer is a ring kept in RAM. Saving writes an MP4 with separate audio tracks, so the mixer works exactly as on Linux.
+
+- **Tracks:** everything except the voice app, the voice app (`Discord.exe` by default), the browser (default browser unless set) and the default mic. Voice app, browser, monitor, FPS and buffer length are set in the sidebar recorder settings.
+- **Defaults:** 60 FPS, 300 s buffer, primary monitor, buffer starts with Clippy.
+- **Hotkeys** (global, rebindable in the sidebar):
+
+| Action | Default |
+|---|---|
+| Start / stop buffer | `Ctrl + Alt + F9` |
+| Save last 10 s | `Ctrl + Shift + F10` |
+| Save last 30 s | `Ctrl + Alt + Shift + F10` |
+| Save last 60 s | `Ctrl + Alt + F10` |
+| Save whole buffer | `Ctrl + Alt + F11` |
+
+  `Alt + F9/F10` is left alone on purpose: NVIDIA ShadowPlay owns it. If another app already holds a combo, Clippy logs it and skips that bind.
+
+### Known limits
+
 - **SmartScreen:** the installer is unsigned, so Windows warns about an unknown publisher. "More info" then "Run anyway".
-- **Recorder:** built in, needs Windows 10 2004 or newer. The replay buffer is kept in RAM, hotkeys are set in the sidebar, and every app gets its own audio track. Encodes on NVIDIA (NVENC), AMD (AMF) or Intel (QSV).
+- **Single user, local only:** the server listens on `127.0.0.1` and has no authentication.
+- **Same server, same UI:** Linux-only scripts in [`scripts/`](scripts) and the Hyprland hotkeys do not apply here.
+
+### From source
+
+```powershell
+git clone -b windows https://github.com/OppaiHacker/Clippy.git
+cd Clippy
+uv sync
+cd frontend; bun install; bun run build; cd ..
+# ffmpeg.exe, ffprobe.exe and clippy-audio.exe on PATH (or in .\bin)
+uv run python -m backend.launcher
+```
+
+`clippy-audio` builds with `cargo build --release --manifest-path native/clippy-audio/Cargo.toml`.
+
+### Building the installer
+
+CI does it: [`windows.yml`](.github/workflows/windows.yml) builds the frontend, runs the tests, builds `clippy-audio`, freezes the app with PyInstaller (`packaging/windows/clippy.spec`), smoke-tests the exe and compiles `packaging/windows/clippy.iss` with Inno Setup. Pushing a `v*` tag attaches `ClippySetup-<version>.exe` to the release. Locally, after PyInstaller:
+
+```powershell
+iscc /DAppVersion=1.2.3 packaging\windows\clippy.iss
+```
 
 ---
 
