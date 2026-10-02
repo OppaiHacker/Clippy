@@ -55,7 +55,6 @@ jobs:
 
       - name: Build exe
         run: |
-          uv run python -c "from backend.launcher import icon_image; icon_image(256).save('packaging/windows/clippy.ico', sizes=[(16,16),(32,32),(48,48),(64,64),(256,256)])"
           uv run pyinstaller --noconfirm packaging/windows/clippy.spec
 
       - name: Smoke test

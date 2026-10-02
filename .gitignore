@@ -29,4 +29,3 @@ graphify-out/
 
 # Windows packaging
 /bin/
-/packaging/windows/clippy.ico
