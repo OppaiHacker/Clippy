@@ -49,6 +49,7 @@ class _Loop(threading.Thread):
                 for i in ids:
                     u32.UnregisterHotKey(None, i)
                 ids = {}
+                taken.clear()
                 for action, combo in self.pending.get_nowait().items():
                     try:
                         parsed = parse_combo(combo)
@@ -59,6 +60,7 @@ class _Loop(threading.Thread):
                         ids[len(ids) + 1] = action
                     elif parsed:
                         logger.warning("hotkey %r (%s) is taken by another app", combo, action)
+                        taken.append(combo)
             elif msg.message == WM_HOTKEY and msg.wParam in ids:
                 # off the loop thread: a save takes seconds and must not stall other hotkeys
                 threading.Thread(target=self.on_action, args=(ids[msg.wParam],), daemon=True).start()
@@ -67,6 +69,7 @@ class _Loop(threading.Thread):
 
 
 _loop: _Loop | None = None
+taken: list[str] = []  # combos RegisterHotKey refused (another app holds them, e.g. GeForce Experience on ALT + F9/F10)
 
 
 def register(binds: dict[str, str], on_action) -> None:

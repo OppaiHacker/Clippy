@@ -104,7 +104,8 @@ def main() -> int:
         finally:
             stop()
 
-    webbrowser.open(url)
+    if "--background" not in sys.argv:  # autostart at login: tray only, no browser tab every boot
+        webbrowser.open(url)
     try:
         import pystray
     except ImportError:

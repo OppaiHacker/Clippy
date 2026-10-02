@@ -22,3 +22,8 @@ def test_windows_fields_validated(tmp_path, monkeypatch):
     assert (cfg.voice_app, cfg.monitor, cfg.autostart) == ("Vesktop.exe", 1, False)
     with pytest.raises(ValidationError):
         r.RecorderConfig(browser_app="x.exe --evil")
+
+def test_bad_config_file_falls_back_to_defaults(tmp_path, monkeypatch):
+    monkeypatch.setattr(r, "RECORDER_CONF", tmp_path / "recorder.env")
+    (tmp_path / "recorder.env").write_text("FPS=sixty\nVOICE_APP=bad name.exe\n")
+    assert r.read_config() == r.RecorderConfig()

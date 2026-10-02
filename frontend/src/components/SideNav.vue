@@ -166,6 +166,7 @@ defineExpose({
               <template v-if="recorder.running">RAM · {{ recorder.buffer ?? '?' }} s · {{ recorder.fps ?? '?' }} fps</template>
               <template v-else>{{ recorderConfig?.binds.toggle || 'ALT + F9' }} to start</template>
             </div>
+            <div v-if="recorder.problem" class="text-[10px] text-warning truncate" :title="recorder.problem">{{ recorder.problem }}</div>
           </div>
         </div>
         <div class="flex items-center gap-1 shrink-0">

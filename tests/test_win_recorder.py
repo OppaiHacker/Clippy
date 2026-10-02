@@ -71,9 +71,11 @@ def test_engine_saves_multitrack_clip(tmp_path):
         assert status.startswith("running (buffer 30s, 10fps -> ")
         time.sleep(4.5)
         clip = eng.save(2, tmp_path)
+        again = eng.save(2, tmp_path)  # same second: must not overwrite the first clip
     finally:
         eng.stop()
     assert clip.suffix == ".mp4" and clip.exists() and not list(tmp_path.glob(".*"))
+    assert again != clip and again.exists() and json.loads(again.with_suffix(".json").read_text())["file"] == again.name
     side = json.loads(clip.with_suffix(".json").read_text())
     assert side["file"] == clip.name and side["type"] == "replay" and side["monitor"] is None
 
@@ -88,3 +90,42 @@ def test_engine_saves_multitrack_clip(tmp_path):
     assert classify_track_kind("Applications: Discord.exe") == ("app", "Discord")
     # first frame decodes (the cut starts on a keyframe)
     subprocess.run(["ffmpeg", "-v", "error", "-i", str(clip), "-frames:v", "1", "-f", "null", "-"], check=True)
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="needs ffmpeg")
+def test_engine_saves_without_audio(tmp_path):
+    # no clippy-audio = no audio inputs; the remux must not demand an audio stream
+    eng = Engine(inputs=(["-re", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=10"], [], []))
+    eng.start(SimpleNamespace(fps=10, buffer=30))
+    try:
+        time.sleep(2.5)
+        clip = eng.save(None, tmp_path)
+    finally:
+        eng.stop()
+    assert clip.exists()
+
+
+@pytest.mark.skipif(not shutil.which("ffmpeg"), reason="needs ffmpeg")
+def test_engine_restarts_ffmpeg_that_quits(monkeypatch):
+    # ddagrab gives up on a resolution change or a UAC prompt; the buffer must come back by itself
+    monkeypatch.setattr(Engine, "RESTART_AFTER", 0)
+    eng = Engine(inputs=(["-re", "-f", "lavfi", "-i", "testsrc2=size=64x64:rate=10:duration=1"], [], []))
+    eng.start(SimpleNamespace(fps=10, buffer=30))
+    first = eng.proc
+    try:
+        for _ in range(50):
+            time.sleep(0.1)
+            if eng.proc is not first and eng.running:
+                break
+        assert eng.proc is not first and eng.running
+    finally:
+        eng.stop()
+    time.sleep(2.5)  # the run stopped by hand must not come back
+    assert not eng.running and eng.proc is None
+
+
+def test_engine_does_not_start_after_close():
+    eng = Engine(inputs=(["-f", "lavfi", "-i", "testsrc2=size=64x64:rate=10"], [], []))
+    eng.close()
+    eng.start(SimpleNamespace(fps=10, buffer=30))
+    assert eng.proc is None

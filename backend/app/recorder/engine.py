@@ -9,6 +9,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -30,15 +31,18 @@ ENCODERS = {
 }
 
 
-@functools.lru_cache(maxsize=1)
-def pick_encoder() -> str:
-    """First encoder that really works on this machine (listed in ffmpeg != usable GPU)."""
-    for enc in list(ENCODERS)[:-1]:
-        r = subprocess.run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=black:s=256x256",
-                            "-frames:v", "1", "-c:v", enc, "-f", "null", "-"],
-                           capture_output=True, creationflags=NO_WINDOW)
-        if r.returncode == 0:
-            return enc
+@functools.lru_cache(maxsize=None)
+def pick_encoder(monitor: int) -> str:
+    """First encoder that really takes this monitor's ddagrab frames. Listed in ffmpeg != usable GPU,
+    and on hybrid laptops the GPU that drives the screen is often not the one with nvenc."""
+    for enc, (vf, _) in list(ENCODERS.items())[:-1]:
+        cmd = ["ffmpeg", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", f"ddagrab=output_idx={monitor}",
+               "-frames:v", "1", *(["-vf", vf] if vf else []), "-c:v", enc, "-f", "null", "-"]
+        try:
+            if subprocess.run(cmd, capture_output=True, timeout=10, creationflags=NO_WINDOW).returncode == 0:
+                return enc
+        except subprocess.TimeoutExpired:
+            pass
     logger.warning("no hardware h264 encoder works, falling back to libx264 (high CPU use)")
     return "libx264"
 
@@ -70,6 +74,8 @@ def foreground_window() -> tuple[str | None, str | None]:
     k32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
     k32.QueryFullProcessImageNameW.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.LPWSTR, ctypes.POINTER(wintypes.DWORD)]
     k32.CloseHandle.argtypes = [wintypes.HANDLE]
+    u32.GetWindowTextW.argtypes = [wintypes.HWND, wintypes.LPWSTR, ctypes.c_int]
+    u32.GetWindowThreadProcessId.argtypes = [wintypes.HWND, ctypes.POINTER(wintypes.DWORD)]
     hwnd = u32.GetForegroundWindow()
     if not hwnd:
         return None, None
@@ -93,10 +99,14 @@ def _pipe_ready(name: str) -> bool:
 
 
 class Engine:
+    RESTART_AFTER = 10  # seconds an ffmpeg must have run before its exit counts as a hiccup worth a restart
+
     def __init__(self, inputs=None):
         # inputs = (video_input, audio_inputs, titles): lavfi sources for tests instead of ddagrab + pipes
         self._inputs = inputs
         self._lock = threading.Lock()
+        self._closed = False  # app is shutting down: a late start (autostart thread, hotkey) must not spawn ffmpeg
+        self._cfg = None  # set while the buffer should be on: the watchdog restarts ffmpeg with it
         self.proc: subprocess.Popen | None = None
         self.helpers: list[subprocess.Popen] = []
         self.ring: Ring | None = None
@@ -132,11 +142,12 @@ class Engine:
             name = f"clippy-{run}-{n}"
             self.helpers.append(subprocess.Popen([helper, "capture", "--pipe", name, *flags], creationflags=NO_WINDOW,
                                                  stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL))
-            for _ in range(50):
+            for _ in range(100):  # WaitNamedPipe returns at once while the pipe does not exist yet
                 if _pipe_ready(rf"\\.\pipe\{name}"):
                     break
                 if self.helpers[-1].poll() is not None:
                     raise RuntimeError(f"clippy-audio exited for track {n + 1}")
+                time.sleep(0.1)
             else:
                 raise RuntimeError(f"audio pipe {name} never appeared")
             audio.append(["-f", "f32le", "-ar", "48000", "-ac", "2", "-thread_queue_size", "4096", "-i", rf"\\.\pipe\{name}"])
@@ -144,34 +155,50 @@ class Engine:
 
     def start(self, cfg) -> str:
         with self._lock:
-            if self.running:
-                return self.status()
-            self._kill()
-            self.error = self.warning = ""
-            self._stderr.clear()
-            try:
-                if self._inputs:
-                    video, audio, self.titles = self._inputs
-                    self.encoder = "libx264"
-                else:
-                    self.encoder = pick_encoder()
-                    video, audio, self.titles = self._real_inputs(cfg)
-                self.fps, self.buffer, self.ring = cfg.fps, cfg.buffer, Ring(cfg.buffer)
-                self.proc = subprocess.Popen(build_cmd(cfg.fps, video, audio, self.encoder, hw=not self._inputs),
-                                             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                                             creationflags=NO_WINDOW)
-            except Exception as e:
-                logger.error("recorder start failed: %s", e)
-                self.error = str(e)
-                self._kill()
-                return self.status()
-            threading.Thread(target=self._pump, args=(self.proc, self.ring), daemon=True).start()
-            threading.Thread(target=self._drain_stderr, args=(self.proc,), daemon=True).start()
+            return self._start(cfg)
+
+    def _start(self, cfg) -> str:
+        if self._closed:
             return self.status()
+        if self.running:
+            return self.status()
+        self._kill()
+        self.error = self.warning = ""
+        self._stderr.clear()
+        try:
+            if self._inputs:
+                video, audio, self.titles = self._inputs
+                self.encoder = "libx264"
+            else:
+                self.encoder = pick_encoder(cfg.monitor)
+                video, audio, self.titles = self._real_inputs(cfg)
+            self.fps, self.buffer, self.ring, self._cfg = cfg.fps, cfg.buffer, Ring(cfg.buffer), cfg
+            self.proc = subprocess.Popen(build_cmd(cfg.fps, video, audio, self.encoder, hw=not self._inputs),
+                                         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                         creationflags=NO_WINDOW)
+        except Exception as e:
+            logger.error("recorder start failed: %s", e)
+            self.error = str(e)
+            self._kill()
+            return self.status()
+        threading.Thread(target=self._pump, args=(self.proc, self.ring), daemon=True).start()
+        threading.Thread(target=self._drain_stderr, args=(self.proc,), daemon=True).start()
+        return self.status()
 
     def _pump(self, proc, ring):
+        started = time.monotonic()
         while chunk := proc.stdout.read1(188 * 256):
             ring.feed(chunk)
+        proc.wait()
+        # ffmpeg quit on its own: a game switched resolution, a UAC prompt took the desktop, a driver reset.
+        # Start a fresh one (the old buffer is lost); one that dies right away is a real error and stays stopped.
+        if time.monotonic() - started < self.RESTART_AFTER:
+            return
+        time.sleep(1)
+        with self._lock:
+            if self.proc is proc and self._cfg:
+                logger.warning("ffmpeg exited (%s), restarting the replay buffer", " | ".join(self._stderr))
+                self._start(self._cfg)
 
     def _drain_stderr(self, proc):
         for line in proc.stderr:
@@ -190,8 +217,14 @@ class Engine:
                 h.terminate()
         self.helpers = []
 
+    def close(self) -> None:
+        with self._lock:
+            self._closed = True
+        self.stop()
+
     def stop(self) -> str:
         with self._lock:
+            self._cfg = None
             self._kill()
             self.proc = None
             self.ring = None
@@ -208,9 +241,13 @@ class Engine:
         clips_dir.mkdir(parents=True, exist_ok=True)
         now = datetime.now().astimezone()
         final = clips_dir / f"Replay_{now:%Y-%m-%d_%H-%M-%S}.mp4"
+        n = 1
+        while final.exists():  # two saves in one second must not overwrite each other
+            n += 1
+            final = clips_dir / f"Replay_{now:%Y-%m-%d_%H-%M-%S}_{n}.mp4"
         tmp = clips_dir / f".{final.name}.part"
         cmd = ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-f", "mpegts", "-i", "pipe:0",
-               "-map", "0:v", "-map", "0:a", "-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart"]
+               "-map", "0:v", "-map", "0:a?", "-c", "copy", "-avoid_negative_ts", "make_zero", "-movflags", "+faststart"]
         for i, title in enumerate(self.titles):
             cmd += [f"-metadata:s:a:{i}", f"title={title}"]
         r = subprocess.run(cmd + ["-f", "mp4", str(tmp)], input=data, capture_output=True, creationflags=NO_WINDOW)

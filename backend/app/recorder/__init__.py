@@ -36,4 +36,4 @@ def startup() -> None:
 def shutdown() -> None:
     if WIN:
         hotkeys.stop()
-        engine.stop()
+        engine.close()

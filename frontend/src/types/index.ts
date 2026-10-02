@@ -129,6 +129,8 @@ export interface RecorderStatus {
   status: string;
   running: boolean;
   raw: string;
+  // Windows engine: why it is off, or what is degraded while it runs
+  problem?: string | null;
   // of the running process (null when stopped)
   fps?: number | null;
   buffer?: number | null;

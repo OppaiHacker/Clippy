@@ -1,3 +1,4 @@
+import logging
 import re
 import shutil
 import subprocess
@@ -7,9 +8,10 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator
 from backend.app.config import settings
 from backend.app import recorder
-from backend.app.recorder import engine
+from backend.app.recorder import engine, hotkeys
 
 WIN = sys.platform == "win32"
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/recorder", tags=["recorder"])
 
@@ -17,7 +19,10 @@ def _win_status():
     out = engine.status()
     buf, fps = re.search(r"(\d+)s\b", out), re.search(r"(\d+)fps", out)
     running = engine.running
-    return {"status": out, "running": running, "raw": out,
+    problems = [engine.warning if running else out.removeprefix("stopped").removeprefix(": ")]
+    if hotkeys.taken:
+        problems.append("hotkeys taken by another app: " + ", ".join(hotkeys.taken))
+    return {"status": out, "running": running, "raw": out, "problem": "; ".join(p for p in problems if p) or None,
             "buffer": int(buf.group(1)) if running and buf else None, "fps": int(fps.group(1)) if running and fps else None}
 
 
@@ -153,10 +158,14 @@ def read_config() -> RecorderConfig:
         if sep:
             raw[key.strip()] = val.strip().strip('"')
     binds = {a: raw.get(f"BIND_{a.upper()}", cfg.binds[a]) for a in BIND_ACTIONS}
-    return RecorderConfig(
-        fps=int(raw.get("FPS", cfg.fps)), buffer=int(raw.get("BUFFER", cfg.buffer)), binds=binds,
-        voice_app=raw.get("VOICE_APP", cfg.voice_app), browser_app=raw.get("BROWSER_APP", cfg.browser_app),
-        monitor=int(raw.get("MONITOR", cfg.monitor)), autostart=raw.get("AUTOSTART", "1") != "0")
+    try:
+        return RecorderConfig(
+            fps=int(raw.get("FPS", cfg.fps)), buffer=int(raw.get("BUFFER", cfg.buffer)), binds=binds,
+            voice_app=raw.get("VOICE_APP", cfg.voice_app), browser_app=raw.get("BROWSER_APP", cfg.browser_app),
+            monitor=int(raw.get("MONITOR", cfg.monitor)), autostart=raw.get("AUTOSTART", "1") != "0")
+    except ValueError as e:  # a hand-edited file must not keep the app (and on Windows the recorder) from starting
+        logger.warning("ignoring invalid %s: %s", RECORDER_CONF, e)
+        return cfg
 
 
 @router.get("/config")
