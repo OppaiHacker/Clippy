@@ -62,8 +62,8 @@ end;
 
 procedure InitializeWizard;
 var
-  I, W, H: Integer;
-  C: TControl;
+  I, N, W, H: Integer;
+  Lefts, Widths: array of Integer;
   Art: String;
   Teto: TBitmapImage;
 begin
@@ -80,17 +80,18 @@ begin
   DropPageImage(WizardForm.WelcomePage, WizardForm.WizardBitmapImage);
   DropPageImage(WizardForm.FinishedPage, WizardForm.WizardBitmapImage2);
 
-  { widen the window by the strip, then shift everything right; anchored controls already moved/stretched }
-  WizardForm.ClientWidth := WizardForm.ClientWidth + W;
-  for I := 0 to WizardForm.ControlCount - 1 do begin
-    C := WizardForm.Controls[I];
-    if not (akRight in C.Anchors) then
-      C.Left := C.Left + W
-    else if akLeft in C.Anchors then begin
-      C.Left := C.Left + W;
-      C.Width := C.Width - W;
-    end;
+  { widen the window by the strip and put every control back where it was, shifted right; geometry is
+    saved first because anchored controls move or stretch on their own when the window grows }
+  N := WizardForm.ControlCount;
+  SetArrayLength(Lefts, N);
+  SetArrayLength(Widths, N);
+  for I := 0 to N - 1 do begin
+    Lefts[I] := WizardForm.Controls[I].Left;
+    Widths[I] := WizardForm.Controls[I].Width;
   end;
+  WizardForm.ClientWidth := WizardForm.ClientWidth + W;
+  for I := 0 to N - 1 do
+    WizardForm.Controls[I].SetBounds(Lefts[I] + W, WizardForm.Controls[I].Top, Widths[I], WizardForm.Controls[I].Height);
 
   Teto := TBitmapImage.Create(WizardForm);
   Teto.Parent := WizardForm;
