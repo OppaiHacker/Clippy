@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { Star, LayoutGrid, List, Play, Mic, Film, Trash2, Check, RotateCcw, X, ArrowLeft } from 'lucide-vue-next';
 import { Clip, TrackKind } from '../types';
 import { updateClip, deleteClip, restoreClip } from '../api/client';
-import { plural } from '../format';
+import { plural, formatDuration } from '../format';
 
 const props = defineProps<{
   clips: Clip[];
@@ -54,12 +54,6 @@ const KIND_LABELS: Record<TrackKind, string> = {
   device: 'Device',
   imported: 'Imported',
 };
-
-function formatDuration(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 const gameCounts = computed(() => {
   const counts: Record<string, number> = {};

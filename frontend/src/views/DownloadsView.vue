@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Download, Trash2, X, Copy, Check, FileVideo, FileAudio, RefreshCw, AlertTriangle, Clock, CheckCircle2, Inbox } from 'lucide-vue-next';
+import { Download, Trash2, X, Copy, Check, FileAudio, RefreshCw, AlertTriangle, Clock, CheckCircle2, Inbox, Play } from 'lucide-vue-next';
 import { fetchExports, fetchJobs, deleteExport, cancelJob } from '../api/client';
 import { Clip, ExportItem, Job } from '../types';
-import { plural } from '../format';
+import { plural, formatDuration } from '../format';
 
 const props = defineProps<{
   clips: Clip[];
@@ -12,6 +12,8 @@ const props = defineProps<{
 const exportsList = ref<ExportItem[]>([]);
 const jobsList = ref<Job[]>([]);
 const copiedId = ref<number | null>(null);
+const playingId = ref<number | null>(null);
+const hoverFrame = ref<{ id: number; frame: number } | null>(null);
 const loaded = ref(false);
 
 let pollTimer: any = null;
@@ -73,11 +75,21 @@ const PRESETS: Record<string, string> = {
   audio_only: 'Audio only',
 };
 
+const presetLabel = (p: string) => (p.startsWith('custom_') ? `Max ${p.slice(7)} MB` : PRESETS[p] || p);
+
 const KINDS: Record<string, string> = { export: 'Export' };
 
 const isActive = (j: Job) => j.state === 'running' || j.state === 'pending';
 const activeCount = computed(() => jobsList.value.filter(isActive).length);
 const exportsSizeMb = computed(() => exportsList.value.reduce((a, e) => a + e.size_bytes, 0) / 1024 ** 2);
+
+const clipOf = (id: number) => props.clips.find(c => c.id === id);
+
+// same sprite scrub as the library cards (8x5 sprite, 40 frames)
+const onScrub = (id: number, e: MouseEvent) => {
+  const r = (e.currentTarget as HTMLElement).getBoundingClientRect();
+  hoverFrame.value = { id, frame: Math.min(39, Math.floor(Math.max(0, (e.clientX - r.left) / r.width) * 40)) };
+};
 
 const clipName = (id: number | null) => {
   const c = id !== null ? props.clips.find(c => c.id === id) : undefined;
@@ -97,72 +109,125 @@ const when = (iso: string) =>
       </p>
     </header>
 
-    <div class="flex-1 overflow-y-auto px-6 py-5 space-y-8">
-      <!-- Queue -->
-      <section v-if="jobsList.length" class="space-y-2.5">
-        <h2 class="text-[11px] font-semibold uppercase tracking-wider text-text-3">Jobs</h2>
-        <div class="bg-surface rounded-xl border border-border divide-y divide-border overflow-hidden">
-          <div v-for="job in jobsList" :key="job.id" class="px-4 py-3 flex items-center gap-4">
-            <span class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" :class="STATE[job.state].cls">
-              <component :is="STATE[job.state].icon" :size="15" :class="job.state === 'running' ? 'animate-spin' : ''" />
-            </span>
-            <div class="flex-1 min-w-0 space-y-1.5">
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="font-semibold text-text truncate">
-                  {{ KINDS[job.kind] || job.kind }}<template v-if="job.preset"> · {{ PRESETS[job.preset] || job.preset }}</template>
-                </span>
-                <span class="text-text-3 truncate">{{ clipName(job.clip_id) }}</span>
-              </div>
-              <div v-if="isActive(job)" class="h-1 bg-surface-3 rounded-full overflow-hidden max-w-md">
-                <div class="h-full bg-accent rounded-full transition-[width] duration-300" :style="{ width: `${Math.round(job.progress * 100)}%` }" />
-              </div>
-              <div v-else-if="job.error" class="text-danger text-[11px] truncate" :title="job.error">{{ job.error }}</div>
+    <!-- Queue: compact, scrolls on its own so it never takes the whole page -->
+    <section v-if="jobsList.length" class="px-6 pt-5 shrink-0">
+      <h2 class="text-[11px] font-semibold uppercase tracking-wider text-text-3 mb-2.5">Queue</h2>
+      <div class="max-h-56 overflow-y-auto bg-surface rounded-xl border border-border divide-y divide-border">
+        <div v-for="job in jobsList" :key="job.id" class="px-3 py-2 flex items-center gap-3">
+          <span class="w-6 h-6 rounded-md flex items-center justify-center shrink-0" :class="STATE[job.state].cls">
+            <component :is="STATE[job.state].icon" :size="13" :class="job.state === 'running' ? 'animate-spin' : ''" />
+          </span>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="font-semibold text-text truncate shrink-0">
+                {{ KINDS[job.kind] || job.kind }}<template v-if="job.preset"> · {{ presetLabel(job.preset) }}</template>
+              </span>
+              <span class="text-text-3 truncate">{{ clipName(job.clip_id) }}</span>
             </div>
-            <span class="px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0" :class="STATE[job.state].cls">{{ STATE[job.state].label }}</span>
-            <span class="mono-num text-text-3 w-24 text-right shrink-0">{{ isActive(job) ? `${Math.round(job.progress * 100)}%` : when(job.created_at) }}</span>
-            <button
-              v-if="isActive(job)"
-              @click="handleCancelJob(job.id)"
-              class="w-7 h-7 rounded-lg flex items-center justify-center text-text-3 hover:text-danger hover:bg-danger/10 cursor-pointer shrink-0"
-              title="Cancel job"
-            >
-              <X :size="14" />
-            </button>
-            <span v-else class="w-7 shrink-0" />
+            <div v-if="isActive(job)" class="mt-1 h-1 bg-surface-3 rounded-full overflow-hidden max-w-md">
+              <div class="h-full bg-accent rounded-full transition-[width] duration-300" :style="{ width: `${Math.round(job.progress * 100)}%` }" />
+            </div>
+            <div v-else-if="job.error" class="text-danger text-[11px] truncate" :title="job.error">{{ job.error }}</div>
           </div>
-        </div>
-      </section>
-
-      <!-- Finished files -->
-      <section class="space-y-2.5">
-        <h2 class="text-[11px] font-semibold uppercase tracking-wider text-text-3">Finished files</h2>
-
-        <div v-if="loaded && !exportsList.length" class="py-14 flex flex-col items-center justify-center text-center gap-3 rounded-xl border border-dashed border-border">
-          <div class="w-12 h-12 rounded-2xl bg-surface-2 border border-border flex items-center justify-center">
-            <Inbox :size="20" class="text-text-3" />
-          </div>
-          <div>
-            <p class="text-sm font-semibold text-text">No exported files</p>
-            <p class="text-xs text-text-3 mt-1">Open a clip in the editor and pick Export.</p>
-          </div>
-        </div>
-
-        <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3">
-          <div
-            v-for="exp in exportsList"
-            :key="exp.id"
-            class="p-3 bg-surface rounded-xl border border-border flex items-center gap-3"
-            :class="exp.exists ? '' : 'opacity-60'"
+          <span class="px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0" :class="STATE[job.state].cls">{{ STATE[job.state].label }}</span>
+          <span class="mono-num text-text-3 w-24 text-right shrink-0">{{ isActive(job) ? `${Math.round(job.progress * 100)}%` : when(job.created_at) }}</span>
+          <button
+            v-if="isActive(job)"
+            @click="handleCancelJob(job.id)"
+            class="w-6 h-6 rounded-md flex items-center justify-center text-text-3 hover:text-danger hover:bg-danger/10 cursor-pointer shrink-0"
+            title="Cancel job"
           >
-            <span class="w-10 h-10 rounded-lg bg-accent/15 text-accent flex items-center justify-center shrink-0">
-              <FileAudio v-if="exp.preset === 'audio_only'" :size="18" />
-              <FileVideo v-else :size="18" />
-            </span>
+            <X :size="13" />
+          </button>
+          <span v-else class="w-6 shrink-0" />
+        </div>
+      </div>
+    </section>
+
+    <!-- Finished files -->
+    <div class="flex-1 overflow-y-auto px-6 py-5">
+      <h2 class="text-[11px] font-semibold uppercase tracking-wider text-text-3 mb-2.5">Finished files</h2>
+
+      <div v-if="loaded && !exportsList.length" class="py-14 flex flex-col items-center justify-center text-center gap-3 rounded-xl border border-dashed border-border">
+        <div class="w-12 h-12 rounded-2xl bg-surface-2 border border-border flex items-center justify-center">
+          <Inbox :size="20" class="text-text-3" />
+        </div>
+        <div>
+          <p class="text-sm font-semibold text-text">No exported files</p>
+          <p class="text-xs text-text-3 mt-1">Open a clip in the editor and pick Export.</p>
+        </div>
+      </div>
+
+      <div v-else class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-4">
+        <div
+          v-for="exp in exportsList"
+          :key="exp.id"
+          :title="exp.filename"
+          class="group bg-surface rounded-xl border border-border hover:border-accent/40 flex flex-col overflow-hidden transition-colors"
+          :class="exp.exists ? '' : 'opacity-60'"
+        >
+          <!-- Preview: the exported file itself when playing, else the clip thumbnail + sprite scrub -->
+          <div class="relative aspect-video bg-black overflow-hidden">
+            <video
+              v-if="playingId === exp.id && exp.preset !== 'audio_only'"
+              :src="`/api/exports/${exp.id}/stream`"
+              class="w-full h-full object-contain"
+              controls
+              autoplay
+            />
+            <template v-else>
+              <div
+                class="absolute inset-0"
+                :class="exp.exists ? 'cursor-pointer' : ''"
+                @mousemove="onScrub(exp.id, $event)"
+                @mouseleave="hoverFrame = null"
+                @click="exp.exists && (playingId = exp.id)"
+              >
+                <img
+                  v-if="clipOf(exp.clip_id)"
+                  :src="`/api/clips/${exp.clip_id}/thumb?v=${clipOf(exp.clip_id)!.thumb_version}`"
+                  alt=""
+                  class="w-full h-full object-cover"
+                  loading="lazy"
+                />
+                <div
+                  v-if="hoverFrame?.id === exp.id && clipOf(exp.clip_id)"
+                  class="absolute inset-0"
+                  :style="{
+                    backgroundImage: `url(/api/clips/${exp.clip_id}/sprite?v=${clipOf(exp.clip_id)!.thumb_version})`,
+                    backgroundPosition: `${((hoverFrame.frame % 8) / 7) * 100}% ${(Math.floor(hoverFrame.frame / 8) / 4) * 100}%`,
+                    backgroundSize: '800% 500%',
+                  }"
+                />
+                <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/70 to-transparent pointer-events-none" />
+                <div v-if="exp.exists" class="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                  <div class="w-11 h-11 rounded-full bg-white/15 backdrop-blur-md border border-white/25 text-white flex items-center justify-center">
+                    <FileAudio v-if="exp.preset === 'audio_only'" :size="17" />
+                    <Play v-else :size="17" class="ml-0.5 fill-white" />
+                  </div>
+                </div>
+              </div>
+              <div class="absolute top-2 left-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur text-[11px] text-white pointer-events-none">
+                {{ presetLabel(exp.preset) }}
+              </div>
+              <div class="absolute bottom-2 right-2 px-1.5 py-0.5 rounded-md bg-black/60 backdrop-blur text-[11px] mono-num text-white pointer-events-none">
+                {{ formatDuration(exp.duration_s) }}
+              </div>
+            </template>
+            <audio
+              v-if="playingId === exp.id && exp.preset === 'audio_only'"
+              :src="`/api/exports/${exp.id}/stream`"
+              class="absolute inset-x-2 bottom-2 w-[calc(100%-1rem)]"
+              controls
+              autoplay
+            />
+          </div>
+
+          <div class="p-3 flex items-center gap-2">
             <div class="flex-1 min-w-0">
-              <div class="font-semibold text-text truncate" :title="exp.filename">{{ exp.filename }}</div>
-              <div class="flex items-center gap-1.5 text-[11px] text-text-3 mt-0.5 mono-num">
-                <span class="font-sans text-text-2">{{ PRESETS[exp.preset] || exp.preset }}</span>
-                <span>·</span><span>{{ (exp.size_bytes / 1024 ** 2).toFixed(1) }} MB</span>
+              <div class="text-[13px] font-semibold text-text truncate">{{ clipName(exp.clip_id) }}</div>
+              <div class="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-3 mono-num">
+                <span>{{ (exp.size_bytes / 1024 ** 2).toFixed(1) }} MB</span>
                 <span>·</span><span>{{ when(exp.created_at) }}</span>
               </div>
               <div v-if="!exp.exists" class="text-[11px] text-warning mt-0.5">File is gone from disk</div>
@@ -186,13 +251,14 @@ const when = (iso: string) =>
               v-if="exp.exists"
               :href="`/api/exports/${exp.id}/download`"
               download
-              class="h-8 px-3 bg-accent hover:bg-accent/90 text-white rounded-lg font-medium flex items-center gap-1.5 shrink-0"
+              class="w-8 h-8 bg-accent hover:bg-accent/90 text-white rounded-lg flex items-center justify-center shrink-0"
+              title="Download"
             >
-              <Download :size="13" /> Download
+              <Download :size="14" />
             </a>
           </div>
         </div>
-      </section>
+      </div>
     </div>
   </main>
 </template>

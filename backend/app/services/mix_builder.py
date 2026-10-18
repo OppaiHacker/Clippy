@@ -14,13 +14,18 @@ def build_ffmpeg_export_command(
     mix_doc: Dict[str, Any],
     preset: str,
     output_path: Path,
-    discord_limit_mb: float = 25.0,
+    discord_limit_mb: float = 20.0,
     total_clip_duration: float = 0.0
 ) -> List[str]:
     """
     Builds the ffmpeg command with audio and video filters from the mix document.
     REMEMBER: normalize=0 on amix is mandatory!
     """
+    # "custom_<MB>" is the Discord encode with a user-picked size limit
+    if preset.startswith("custom_"):
+        discord_limit_mb = float(preset.removeprefix("custom_"))
+        preset = "discord"
+
     cmd = ["ffmpeg", "-v", "error", "-y"]
 
     # Input 0: the main video clip
@@ -241,7 +246,7 @@ def build_ffmpeg_export_command(
         return cmd
 
     if preset == "discord":
-        # Target size limit e.g. 25MB
+        # Target size limit (20 MB, or the custom one)
         calc_dur = max(1.0, (t1 - t0) / speed)
 
         total_bits = discord_limit_mb * 8 * 1024 * 1024 * 0.95  # 5% safety margin

@@ -53,7 +53,7 @@ Free tags, merge, rename. Game name resolved from the `steam_app_<id>` sidecar h
 In/out trim, speed, 9:16 crop, video fade in/out, limiter and LUFS normalization on master. Frame stepping, with keyframes marked on the ruler.
 
 ### 📦 Export presets
-`Original` (stream-copies the video unless it has to cut or filter it, remixes the audio) · `Discord` (bitrate solved from target size and duration, not guessed) · `YouTube` · `Vertical 9:16` · `Audio only`.
+`Original` (stream-copies the video unless it has to cut or filter it, remixes the audio) · `Discord` (20 MB; bitrate solved from target size and duration, not guessed) · `Custom size` (same, with your own max MB) · `YouTube` · `Vertical 9:16` · `Audio only`.
 
 ### 👀 Watcher + job queue
 A `watchfiles` watcher ingests new clips the moment they hit the directory. Thumbnails, sprite sheets, waveform peaks and keyframe indexes are built by a background worker, never on the request path.
@@ -334,6 +334,7 @@ The listen address and port are `uvicorn` flags (`--host`, `--port`), not settin
 | `POST` | `/api/clips/{id}/export` | Queue a render |
 | `GET` | `/api/exports` | Finished renders |
 | `GET` | `/api/exports/{id}/download` | Download a render |
+| `GET` | `/api/exports/{id}/stream` | Play a render (Range requests) |
 | `DELETE` | `/api/exports/{id}` | Delete a render |
 | `GET` | `/api/jobs` | Job queue |
 | `DELETE` | `/api/jobs/{id}` | Cancel a job |

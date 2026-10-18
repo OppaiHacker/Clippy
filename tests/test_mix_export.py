@@ -44,3 +44,15 @@ def test_vertical_is_really_vertical():
 def test_original_copies_video_unless_it_must_cut():
     assert "-c:v copy" in _cmd([{"stream_index": 1}])
     assert "-c:v copy" not in _cmd([{"stream_index": 1}], trim={"start": 2.0, "end": 5.0})
+
+
+def _video_kbps(cmd):
+    return int(cmd.split("-b:v ")[1].split("k")[0])
+
+
+def test_size_capped_presets_scale_bitrate():
+    discord = _video_kbps(_cmd([{"stream_index": 1}], preset="discord"))
+    custom = _video_kbps(_cmd([{"stream_index": 1}], preset="custom_40"))
+    # 20 MB over 60 s, minus 128k audio; custom 40 MB is about twice that
+    assert 2400 < discord < 2700
+    assert custom > 2 * discord
