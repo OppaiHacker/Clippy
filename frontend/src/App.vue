@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import AppDialog from './components/AppDialog.vue';
 import SideNav from './components/SideNav.vue';
 import LibraryView from './views/LibraryView.vue';
 import EditorView from './views/EditorView.vue';
@@ -151,6 +152,8 @@ const handleBackToLibrary = () => {
       />
       </Transition>
     </div>
+
+    <AppDialog />
 
     <!-- Keyboard Shortcuts Cheat Sheet Modal -->
     <ShortcutsModal

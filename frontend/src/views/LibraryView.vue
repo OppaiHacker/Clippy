@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { confirmDialog } from '../components/AppDialog.vue';
 import { Star, LayoutGrid, List, Play, Mic, Film, Trash2, Check, RotateCcw, X, ArrowLeft } from 'lucide-vue-next';
 import { Clip, TrackKind } from '../types';
 import { updateClip, deleteClip, restoreClip } from '../api/client';
@@ -168,7 +169,7 @@ const deleteSelected = async () => {
   const message = props.trash
     ? `Delete ${n} FOREVER? The files will be removed from disk.`
     : `Move ${n} to the trash? They will be removed from disk after ${TRASH_RETENTION_DAYS} days.`;
-  if (!confirm(message)) return;
+  if (!(await confirmDialog(message, { okLabel: props.trash ? 'Delete forever' : 'Move to trash', danger: true }))) return;
 
   for (const id of props.selectedClipIds) {
     try {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { confirmDialog, alertDialog } from '../components/AppDialog.vue';
 import {
   Play, Pause, SkipBack, SkipForward, Scissors, Repeat, ArrowLeft,
   Gauge, Crop, Sparkles, Tag as TagIcon, Download, Mic, Plus, Trash2,
@@ -268,10 +269,13 @@ onMounted(async () => {
 
   // Keyboard shortcuts
   window.addEventListener('keydown', handleKeydown);
+  // the container too: a video smaller than the player moves without resizing
+  if (videoRef.value) [videoRef.value, videoRef.value.parentElement!].forEach(el => videoResize.observe(el));
 });
 
 onUnmounted(() => {
   window.removeEventListener('keydown', handleKeydown);
+  videoResize.disconnect();
   if (saveTimer) saveMix(); // unsaved change from the last 600 ms
   if (vuRafId) cancelAnimationFrame(vuRafId);
   syncEngine.detachVideo();
@@ -484,13 +488,100 @@ const setSpeed = (s: number) => {
   pushHistory();
 };
 
-// 9:16 from the centre of the frame, computed from the clip size (a hardcoded 810x1440 broke 1080p clips)
-const setVerticalCrop = (vertical: boolean) => {
-  const { width, height } = props.clip;
-  const w = Math.round((height * 9) / 16 / 2) * 2;
-  currentMix.value.crop = vertical ? { w, h: height, x: Math.round((width - w) / 2), y: 0 } : null;
+// Crop to an aspect ratio: the biggest box that fits the frame, slid along the free axis by pos (0..1).
+// Computed from the clip size (a hardcoded 810x1440 broke 1080p clips); even sizes for the encoder.
+const CROP_ASPECTS = [[9, 16], [4, 5], [1, 1], [4, 3], [16, 9]] as const;
+const even = (n: number) => Math.round(n / 2) * 2;
+const cropAspects = computed(() =>
+  CROP_ASPECTS.filter(([a, b]) => Math.abs(a / b - props.clip.width / props.clip.height) > 0.01),
+);
+// Free = any box; otherwise resizing keeps the aspect of the current crop
+const freeCrop = ref(false);
+const cropAspect = computed(() => {
+  const c = currentMix.value.crop;
+  return c && !freeCrop.value ? CROP_ASPECTS.find(([a, b]) => Math.abs(c.w / c.h - a / b) < 0.02) ?? null : null;
+});
+const cropPos = computed(() => {
+  const c = currentMix.value.crop;
+  const { width: W, height: H } = props.clip;
+  if (!c) return 0.5;
+  return W > c.w ? c.x / (W - c.w) : H > c.h ? c.y / (H - c.h) : 0.5;
+});
+const setCrop = (aspect: readonly [number, number] | null, pos = cropPos.value) => {
+  const { width: W, height: H } = props.clip;
+  freeCrop.value = false;
+  if (!aspect) {
+    currentMix.value.crop = null;
+  } else {
+    const narrow = aspect[0] / aspect[1] < W / H; // full height, slides horizontally
+    const w = narrow ? even((H * aspect[0]) / aspect[1]) : W;
+    const h = narrow ? H : even((W * aspect[1]) / aspect[0]);
+    currentMix.value.crop = { w, h, x: Math.round((W - w) * pos), y: Math.round((H - h) * pos) };
+  }
   pushHistory();
 };
+
+const setFreeCrop = () => {
+  const { width: W, height: H } = props.clip;
+  if (!currentMix.value.crop) {
+    currentMix.value.crop = { w: even(W * 0.8), h: even(H * 0.8), x: Math.round(W * 0.1), y: Math.round(H * 0.1) };
+    pushHistory();
+  }
+  freeCrop.value = true;
+};
+
+// Drag the crop frame on the player: the body moves it, a corner resizes it from the opposite corner.
+// Works in source pixels; the rendered video size gives the scale.
+const MIN_CROP = 64;
+const cropEditable = computed(() => activeToolTab.value === 'crop' || activeToolTab.value === 'export');
+let cropDrag: { px: number; py: number; c: { w: number; h: number; x: number; y: number }; sx: number; sy: number; lock: number | null } | null = null;
+
+const startCropDrag = (e: PointerEvent, sx = 0, sy = 0) => {
+  const c = currentMix.value.crop;
+  if (!c) return;
+  (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  cropDrag = { px: e.clientX, py: e.clientY, c: { ...c }, sx, sy, lock: cropAspect.value ? c.w / c.h : null };
+};
+
+const onCropDrag = (e: PointerEvent) => {
+  if (!cropDrag || !videoBox.value.width) return;
+  const { width: W, height: H } = props.clip;
+  const k = W / videoBox.value.width;
+  const dx = (e.clientX - cropDrag.px) * k;
+  const dy = (e.clientY - cropDrag.py) * k;
+  const { c, sx, sy, lock } = cropDrag;
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  if (!sx) {
+    currentMix.value.crop = { ...c, x: Math.round(clamp(c.x + dx, 0, W - c.w)), y: Math.round(clamp(c.y + dy, 0, H - c.h)) };
+    return;
+  }
+  // anchor = the corner opposite to the dragged one
+  const ax = sx > 0 ? c.x : c.x + c.w;
+  const ay = sy > 0 ? c.y : c.y + c.h;
+  const maxW = sx > 0 ? W - ax : ax;
+  const maxH = sy > 0 ? H - ay : ay;
+  let w = clamp(c.w + sx * dx, MIN_CROP, maxW);
+  let h = clamp(c.h + sy * dy, MIN_CROP, maxH);
+  if (lock) {
+    w = Math.min(w, maxH * lock);
+    h = w / lock;
+  }
+  w = Math.min(even(w), maxW);
+  h = Math.min(even(h), maxH);
+  currentMix.value.crop = { w, h, x: Math.round(sx > 0 ? ax : ax - w), y: Math.round(sy > 0 ? ay : ay - h) };
+};
+
+const endCropDrag = () => {
+  if (cropDrag) pushHistory();
+  cropDrag = null;
+};
+
+// rendered video rect inside the player, for the crop frame overlay
+const videoBox = ref({ left: 0, top: 0, width: 0, height: 0 });
+const videoResize = new ResizeObserver(() => {
+  const v = videoRef.value;
+  if (v) videoBox.value = { left: v.offsetLeft, top: v.offsetTop, width: v.offsetWidth, height: v.offsetHeight };
+});
 
 // Export Trigger
 const isExporting = ref(false);
@@ -521,6 +612,14 @@ const LUFS_OPTIONS = [
   { value: -23, label: '−23 LUFS (EBU R128)' },
 ];
 
+// Vertical without a crop would cut the centre blindly: start a 9:16 frame and let it be placed
+const pickExportPreset = (id: typeof exportPreset.value) => {
+  exportPreset.value = id;
+  if (id === 'vertical' && !currentMix.value.crop) {
+    setCrop(CROP_ASPECTS[0]);
+  }
+};
+
 const triggerExport = async () => {
   isExporting.value = true;
   try {
@@ -529,7 +628,7 @@ const triggerExport = async () => {
     await startExportJob(props.clip.id, preset, currentMix.value);
     emit('goto-downloads');
   } catch (e) {
-    alert('Could not start the export: ' + e);
+    alertDialog('Could not start the export: ' + e);
   } finally {
     isExporting.value = false;
   }
@@ -548,7 +647,7 @@ const handleFileImport = async (e: Event) => {
     await uploadTrack(props.clip.id, file, 'file', file.name);
     emit('refresh');
   } catch (err) {
-    alert('Could not import the audio file: ' + err);
+    alertDialog('Could not import the audio file: ' + err);
   }
 };
 
@@ -579,7 +678,7 @@ const toggleVoiceover = async () => {
           await uploadTrack(props.clip.id, blob, 'voiceover', `Voiceover ${new Date().toLocaleTimeString()}`);
           emit('refresh');
         } catch (e) {
-          alert('Could not save the voiceover: ' + e);
+          alertDialog('Could not save the voiceover: ' + e);
         }
       };
 
@@ -594,7 +693,7 @@ const toggleVoiceover = async () => {
       syncEngine.play();
       isPlaying.value = true;
     } catch (err) {
-      alert('Could not access the microphone: ' + err);
+      alertDialog('Could not access the microphone: ' + err);
     }
   }
 };
@@ -617,13 +716,13 @@ const removeTag = async (tagId: number) => {
 };
 
 const removeImport = async (importId: number, name: string) => {
-  if (!confirm(`Remove track "${name}"?`)) return;
+  if (!(await confirmDialog(`Remove track "${name}"?`, { okLabel: 'Remove', danger: true }))) return;
   try {
     await saveMix();
     await deleteImportedTrack(props.clip.id, importId);
     emit('refresh');
   } catch (e) {
-    alert('Could not remove the track: ' + e);
+    alertDialog('Could not remove the track: ' + e);
   }
 };
 </script>
@@ -725,8 +824,42 @@ const removeImport = async (importId: number, name: string) => {
             <Play :size="22" class="ml-1 fill-white" />
           </div>
         </div>
+        <div
+          v-if="currentMix.crop"
+          class="absolute overflow-hidden pointer-events-none"
+          :style="{ left: `${videoBox.left}px`, top: `${videoBox.top}px`, width: `${videoBox.width}px`, height: `${videoBox.height}px` }"
+        >
+          <div
+            class="absolute border-2 border-accent shadow-[0_0_0_9999px_rgba(0,0,0,0.55)]"
+            :class="cropEditable ? 'pointer-events-auto cursor-move touch-none' : ''"
+            @pointerdown="startCropDrag($event)"
+            @pointermove="onCropDrag"
+            @pointerup="endCropDrag"
+            @pointercancel="endCropDrag"
+            :style="{
+              left: `${(currentMix.crop.x / clip.width) * 100}%`,
+              top: `${(currentMix.crop.y / clip.height) * 100}%`,
+              width: `${(currentMix.crop.w / clip.width) * 100}%`,
+              height: `${(currentMix.crop.h / clip.height) * 100}%`,
+            }"
+          >
+            <template v-if="cropEditable">
+              <span
+                v-for="[sx, sy] in [[-1, -1], [1, -1], [-1, 1], [1, 1]]"
+                :key="`${sx}${sy}`"
+                class="absolute w-3.5 h-3.5 rounded-sm bg-accent border-2 border-white"
+                :class="sx === sy ? 'cursor-nwse-resize' : 'cursor-nesw-resize'"
+                :style="{ [sx < 0 ? 'left' : 'right']: '-8px', [sy < 0 ? 'top' : 'bottom']: '-8px' }"
+                @pointerdown.stop="startCropDrag($event, sx, sy)"
+                @pointermove="onCropDrag"
+                @pointerup="endCropDrag"
+                @pointercancel="endCropDrag"
+              />
+            </template>
+          </div>
+        </div>
         <div v-if="currentMix.crop" class="absolute top-3 left-3 px-2 py-0.5 rounded-md bg-black/60 backdrop-blur text-[11px] text-white flex items-center gap-1 pointer-events-none">
-          <Crop :size="11" /> 9:16 crop in export
+          <Crop :size="11" /> {{ cropAspect ? cropAspect.join(':') : `${currentMix.crop.w}×${currentMix.crop.h}` }} crop in export
         </div>
         <div v-if="isRecordingVoiceover" class="rec-live absolute top-3 right-3 px-2.5 py-1 rounded-full bg-danger text-white text-[11px] font-medium flex items-center gap-1.5 pointer-events-none">
           <span class="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Recording voiceover · {{ voiceoverSeconds }} s
@@ -1081,12 +1214,25 @@ const removeImport = async (importId: number, name: string) => {
         <!-- Crop -->
         <template v-else-if="activeToolTab === 'crop'">
           <span class="text-text-3">Format:</span>
-          <button @click="setVerticalCrop(false)" class="chip" :class="currentMix.crop === null ? 'chip-on' : ''">
+          <button @click="setCrop(null)" class="chip" :class="currentMix.crop === null ? 'chip-on' : ''">
             <span class="w-4 h-2.5 rounded-[2px] border border-current" /> Original {{ clip.width }}×{{ clip.height }}
           </button>
-          <button @click="setVerticalCrop(true)" class="chip" :class="currentMix.crop !== null ? 'chip-on' : ''">
-            <span class="w-2.5 h-4 rounded-[2px] border border-current" /> Vertical 9:16 · centre of frame
+          <button
+            v-for="a in cropAspects"
+            :key="a.join(':')"
+            @click="setCrop(a)"
+            class="chip mono-num"
+            :class="cropAspect === a ? 'chip-on' : ''"
+          >
+            <span class="rounded-[2px] border border-current" :style="{ width: `${a[0] / Math.max(...a) * 16}px`, height: `${a[1] / Math.max(...a) * 16}px` }" />
+            {{ a[0] }}:{{ a[1] }}
           </button>
+          <button @click="setFreeCrop" class="chip" :class="currentMix.crop && !cropAspect ? 'chip-on' : ''">
+            <span class="w-3.5 h-3 rounded-[2px] border border-dashed border-current" /> Free
+          </button>
+          <span v-if="currentMix.crop" class="text-text-3 mono-num">
+            {{ currentMix.crop.w }}×{{ currentMix.crop.h }} · drag the frame to move, corners to resize
+          </span>
         </template>
 
         <!-- Fades -->
@@ -1141,7 +1287,7 @@ const removeImport = async (importId: number, name: string) => {
             <button
               v-for="p in EXPORT_PRESETS"
               :key="p.id"
-              @click="exportPreset = p.id"
+              @click="pickExportPreset(p.id)"
               class="h-10 px-3 rounded-lg border text-left cursor-pointer whitespace-nowrap"
               :class="exportPreset === p.id ? 'border-accent/60 bg-accent/15' : 'border-border bg-surface-2 hover:border-border-strong'"
             >
