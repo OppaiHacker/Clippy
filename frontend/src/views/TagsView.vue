@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
+import { confirmDialog, alertDialog } from '../components/AppDialog.vue';
 import { Plus, Trash2, ArrowRight, Tag as TagIcon } from 'lucide-vue-next';
 import { fetchTags, createTag, deleteTag } from '../api/client';
 import { TagItem } from '../types';
@@ -32,13 +33,13 @@ const handleCreateTag = async () => {
     newTagName.value = '';
     loadTags();
   } catch (e) {
-    alert('Could not add the tag: ' + e);
+    alertDialog('Could not add the tag: ' + e);
   }
 };
 
 const handleDeleteTag = async (t: TagItem) => {
   const used = t.count ? ` It will be removed from ${t.count} ${plural(t.count, 'clip')}.` : '';
-  if (!confirm(`Delete tag #${t.name}?${used}`)) return;
+  if (!(await confirmDialog(`Delete tag #${t.name}?${used}`, { okLabel: 'Delete', danger: true }))) return;
   try {
     await deleteTag(t.id);
     loadTags();

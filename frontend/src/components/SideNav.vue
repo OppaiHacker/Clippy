@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import { alertDialog } from './AppDialog.vue';
 import { Film, Sliders, Download, Tag, Settings, Search, RefreshCw, Keyboard, Check, X, Power, SlidersHorizontal } from 'lucide-vue-next';
 import { fetchRecorderStatus, toggleRecorder, fetchJobs, saveReplay, fetchRecorderConfig } from '../api/client';
 import { RecorderStatus, RecorderConfig } from '../types';
@@ -66,7 +67,7 @@ const handleSaveReplay = async (seconds: number) => {
     savedFlash.value = true;
     setTimeout(() => (savedFlash.value = false), 1600);
   } catch (e) {
-    alert('Could not save the clip: ' + e);
+    alertDialog('Could not save the clip: ' + e);
   } finally {
     savingSeconds.value = null;
   }
@@ -77,7 +78,7 @@ const handleToggleRecorder = async () => {
   try {
     recorder.value = await toggleRecorder();
   } catch (e) {
-    alert('Could not toggle the recorder: ' + e);
+    alertDialog('Could not toggle the recorder: ' + e);
   } finally {
     isTogglingRecorder.value = false;
   }

@@ -206,7 +206,8 @@ def build_ffmpeg_export_command(
     if preset == "vertical":
         if not has_crop:
             video_filters.append("crop=ih*9/16:ih")
-        video_filters.append("scale=1080:1920")
+        # a non-9:16 crop (1:1, 4:5...) is letterboxed into the 1080x1920 frame, never stretched
+        video_filters.append("scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2")
 
     if video_filters:
         video_chain = "[0:v]" + ",".join(video_filters) + "[final_video]"
