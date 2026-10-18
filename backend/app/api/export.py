@@ -1,16 +1,20 @@
+import re
 from typing import List, Optional, Dict, Any
 from pathlib import Path
 from pydantic import BaseModel
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 from backend.app.database import get_db
 from backend.app.models.models import Export, Job, Clip, MixDocument
+from backend.app.services.streaming import send_partial_file
 
 router = APIRouter(tags=["exports"])
 
 EXPORT_PRESETS = {"original", "discord", "youtube", "vertical", "audio_only"}
+# size-capped export with a user-picked limit, e.g. "custom_50" = max 50 MB
+CUSTOM_PRESET = re.compile(r"custom_(\d{1,5})")
 
 class ExportRequest(BaseModel):
     preset: str = "original"
@@ -32,7 +36,9 @@ async def create_export_job(clip_id: int, req: ExportRequest, db: AsyncSession =
             mix.doc = req.mix_doc
         await db.commit()
 
-    if req.preset not in EXPORT_PRESETS:
+    if req.preset not in EXPORT_PRESETS and not (
+        (m := CUSTOM_PRESET.fullmatch(req.preset)) and int(m[1]) >= 1
+    ):
         raise HTTPException(status_code=400, detail=f"Unknown preset {req.preset!r}")
 
     job = Job(
@@ -84,6 +90,14 @@ async def download_export(export_id: int, db: AsyncSession = Depends(get_db)):
         filename=p.name,
         headers={"Content-Disposition": f'attachment; filename="{p.name}"'}
     )
+
+@router.get("/api/exports/{export_id}/stream")
+async def stream_export(export_id: int, request: Request, db: AsyncSession = Depends(get_db)):
+    exp = await db.get(Export, export_id)
+    if not exp:
+        raise HTTPException(status_code=404, detail="Export not found")
+    media = "audio/ogg" if exp.path.endswith(".ogg") else "video/mp4"
+    return send_partial_file(Path(exp.path), request, media)
 
 @router.delete("/api/exports/{export_id}")
 async def delete_export(export_id: int, db: AsyncSession = Depends(get_db)):

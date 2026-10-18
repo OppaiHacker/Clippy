@@ -494,13 +494,15 @@ const setVerticalCrop = (vertical: boolean) => {
 
 // Export Trigger
 const isExporting = ref(false);
-const exportPreset = ref<'original' | 'discord' | 'youtube' | 'vertical' | 'audio_only'>('original');
+const exportPreset = ref<'original' | 'discord' | 'youtube' | 'vertical' | 'audio_only' | 'custom'>('original');
+const customMaxMb = ref(50);
 const EXPORT_PRESETS = [
   { id: 'original', label: 'Original', hint: 'video copy, new mix' },
-  { id: 'discord', label: 'Discord', hint: 'up to 25 MB' },
+  { id: 'discord', label: 'Discord', hint: 'up to 20 MB' },
   { id: 'youtube', label: 'YouTube', hint: '1440p60, high quality' },
   { id: 'vertical', label: 'Vertical 9:16', hint: 'Shorts / TikTok' },
   { id: 'audio_only', label: 'Audio only', hint: 'Opus' },
+  { id: 'custom', label: 'Custom size', hint: 'your own max MB' },
 ] as const;
 
 const TOOLS = [
@@ -523,7 +525,8 @@ const triggerExport = async () => {
   isExporting.value = true;
   try {
     await saveMix();
-    await startExportJob(props.clip.id, exportPreset.value, currentMix.value);
+    const preset = exportPreset.value === 'custom' ? `custom_${Math.max(1, Math.round(customMaxMb.value || 0))}` : exportPreset.value;
+    await startExportJob(props.clip.id, preset, currentMix.value);
     emit('goto-downloads');
   } catch (e) {
     alert('Could not start the export: ' + e);
@@ -1145,6 +1148,17 @@ const removeImport = async (importId: number, name: string) => {
               <div class="font-medium leading-tight" :class="exportPreset === p.id ? 'text-text' : 'text-text-2'">{{ p.label }}</div>
               <div class="text-[10px] text-text-3 leading-tight">{{ p.hint }}</div>
             </button>
+            <label v-if="exportPreset === 'custom'" class="h-10 px-2.5 rounded-lg border border-border bg-surface-2 flex items-center gap-1.5 text-text-2">
+              Max
+              <input
+                v-model.number="customMaxMb"
+                type="number"
+                min="1"
+                max="99999"
+                class="w-16 h-7 px-1.5 rounded-md bg-surface-3 border border-border text-text mono-num outline-none focus:border-accent/60"
+              />
+              MB
+            </label>
           </div>
           <button
             @click="triggerExport"
